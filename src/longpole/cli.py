@@ -14,6 +14,8 @@ options:
 
 commands:
   <command>
+    enable           switch CMake instrumentation on for a build tree, or for every build with
+                     --global
 """
 
 from __future__ import annotations

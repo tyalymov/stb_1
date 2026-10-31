@@ -65,6 +65,14 @@ class CMakeToolError(LongpoleError):
     """
 
 
+class UnsupportedCMakeError(LongpoleError):
+    """The ``cmake`` found is older than 4.3 and has no instrumentation API.
+
+    The message names the executable and its version so the user can point
+    ``--cmake`` at another one.
+    """
+
+
 class FileApiError(LongpoleError):
     """A CMake File API reply cannot be read.
 
