@@ -115,6 +115,7 @@ name = "longpole"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
+    { name = "platformdirs" },
 ]
 
 [package.dev-dependencies]
@@ -128,7 +129,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "jsonschema", specifier = ">=4.26.0" }]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.26.0" },
+    { name = "platformdirs", specifier = ">=4.14.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [

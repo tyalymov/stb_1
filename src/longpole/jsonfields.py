@@ -262,6 +262,17 @@ class Fields:
             raise FieldError(f"field {key!r} must be an array, got {value!r}")
         return cast(list[object], value)
 
+    def value(self, key: str) -> object | None:
+        """The raw value of a field, for shapes the typed accessors do not cover.
+
+        Args:
+            key: Field name.
+
+        Returns:
+            Whatever is stored, or ``None`` when absent.
+        """
+        return self._document.get(key)
+
     def objects(self, key: str) -> tuple[Fields, ...]:
         """An optional array of objects, each wrapped; absent means empty.
 

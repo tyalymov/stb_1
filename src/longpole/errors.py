@@ -58,3 +58,19 @@ class FileApiError(LongpoleError):
     Raised when a reply file is not JSON, is not an object, or lacks a field
     the codemodel or toolchains object kind promises.
     """
+
+
+class DumpFormatError(LongpoleError):
+    """A run dump on disk does not have the layout ``docs/dump-format.md`` describes.
+
+    Raised for a missing or malformed ``manifest.json`` or ``steps.jsonl``,
+    or a field of the wrong type.
+    """
+
+
+class UnknownRunError(LongpoleError):
+    """A run reference does not name exactly one stored run.
+
+    Raised for an id prefix that matches nothing or several runs, a ``sha:``
+    or ``label:`` with no match, or ``latest`` in an empty store.
+    """

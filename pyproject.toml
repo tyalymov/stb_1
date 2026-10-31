@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "jsonschema>=4.26.0",
+    "platformdirs>=4.14.0",
 ]
 
 [project.urls]
