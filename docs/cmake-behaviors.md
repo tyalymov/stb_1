@@ -5,7 +5,7 @@ open. This page records what CMake actually does, as pinned by
 `tests/test_cmake_behaviors.py` and the fixture tests. When a new release
 changes one of these, the test fails and this table gets a new row.
 
-Observed on 2026-10-31, macOS 15 (arm64), Ninja generator, CMake 4.3.6,
+Observed on 2026-10-31, macOS 26 (arm64), Ninja generator, CMake 4.3.6,
 4.4.4, 4.4.5 and 4.5.0-rc2. All rows held on every version unless noted.
 
 | # | Question | Observation | What longpole does about it |
