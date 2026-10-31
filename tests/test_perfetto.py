@@ -77,11 +77,20 @@ def test_targets_are_processes_and_the_graph_becomes_flows() -> None:
 
 
 def test_critical_path_gets_its_own_track() -> None:
-    """The chain a, b, c appears as three slices on the critical path process."""
+    """Each segment of the chain is a slice on its own lane of the critical path process."""
     events = _events(sample_run())
     track = _slices(events, perfetto.CRITICAL_PATH_CATEGORY)
-    assert [event["name"] for event in track] == ["a", "b", "c"]
+    assert [event["name"] for event in track] == ["a compile", "a link", "b link", "c link"]
     assert all(event["pid"] == perfetto.CRITICAL_PATH_PID for event in track)
+    assert len({event["tid"] for event in track}) == len(track), "one lane per segment"
+    lane_names = {
+        str(event["args"]["name"])  # type: ignore[index]
+        for event in events
+        if event["ph"] == "M"
+        and event["name"] == "thread_name"
+        and event["pid"] == perfetto.CRITICAL_PATH_PID
+    }
+    assert lane_names == {"a compile", "a link", "b link", "c link"}
     without_graph = _slices(_events(sample_run(with_graph=False)), perfetto.CRITICAL_PATH_CATEGORY)
     assert without_graph == []
 
@@ -129,9 +138,11 @@ def test_export_writes_a_file_or_stdout(tmp_path: Path, capsys: pytest.CaptureFi
 @pytest.mark.cmake
 @pytest.mark.slow
 def test_real_chain_trace_has_a_slice_per_step_and_the_path(chain_run: Run) -> None:
-    """A real build renders every step and puts a, b and c on the critical path track."""
+    """A real build renders every step; the path track runs from a's generator to c's link."""
     events = _events(chain_run)
     assert len(_slices(events)) == len(chain_run.steps)
     track = _slices(events, perfetto.CRITICAL_PATH_CATEGORY)
-    assert [event["name"] for event in track] == ["a", "b", "c"]
+    names = [event["name"] for event in track]
+    assert names[0] == "a custom" and names[-1] == "c link"
+    assert {"a link", "b link"} <= set(names)
     assert len([event for event in events if event["ph"] == "s"]) >= 2

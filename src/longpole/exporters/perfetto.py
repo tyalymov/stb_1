@@ -20,7 +20,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from longpole import __version__
-from longpole.analyzers.critical_path import CriticalPath
+from longpole.analyzers import critical_path
+from longpole.analyzers.critical_path import CriticalPath, Segment
 from longpole.analyzers.report import Report
 from longpole.model import Run, Step
 
@@ -360,7 +361,13 @@ def _flow_events(run: Run, placed: list[_Placed], origin_ms: int) -> Iterable[Ev
 def _critical_path_events(
     path: CriticalPath, placed: list[_Placed], origin_ms: int
 ) -> Iterable[Event]:
-    """One slice per target on the critical path, spanning that target's steps.
+    """One slice per segment of the critical path, over the steps the segment stands for.
+
+    A segment is drawn at the wall-clock time its steps actually ran: the
+    longest compile, the longest custom command or the link steps of the
+    target. Segments of a chain overlap in real time, since the build runs
+    dependents alongside their dependencies, so each one gets a lane of its
+    own and the lane is named after it.
 
     Args:
         path: The critical path.
@@ -368,26 +375,56 @@ def _critical_path_events(
         origin_ms: Start of the trace.
 
     Yields:
-        Complete events on the critical path process.
+        Thread metadata and complete events on the critical path process.
     """
-    for target in path.chain:
-        steps = [item.step for item in placed if item.step.target == target.name]
+    for lane, segment in enumerate(path.chain, start=1):
+        steps = _segment_steps(segment, placed)
         if not steps:
             continue
+        label = f"{segment.target} {segment.kind}"
+        yield {
+            "name": "thread_name",
+            "ph": "M",
+            "pid": CRITICAL_PATH_PID,
+            "tid": lane,
+            "args": {"name": label},
+        }
         start = min(step.time_start_ms for step in steps)
         end = max(step.time_end_ms for step in steps)
         yield {
-            "name": target.name,
+            "name": label,
             "cat": CRITICAL_PATH_CATEGORY,
             "ph": "X",
             "ts": (start - origin_ms) * 1000,
             "dur": (end - start) * 1000,
             "pid": CRITICAL_PATH_PID,
-            "tid": 1,
+            "tid": lane,
             "args": {
-                "cost_ms": target.total_ms,
-                "compile_ms": target.compile_ms,
-                "link_ms": target.link_ms,
-                "custom_ms": target.custom_ms,
+                "cost_ms": segment.duration_ms,
+                "model_start_ms": segment.start_ms,
+                "detail": segment.detail,
             },
         }
+
+
+def _segment_steps(segment: Segment, placed: list[_Placed]) -> list[Step]:
+    """Find the steps a segment of the critical path stands for.
+
+    Args:
+        segment: The segment.
+        placed: The placed steps.
+
+    Returns:
+        The longest compile of the target for a compile segment, the custom
+        command with the segment's outputs for a custom segment, every link
+        step of the target for a link segment. Empty if the steps cannot be
+        found, which the caller treats as nothing to draw.
+    """
+    steps = [item.step for item in placed if item.step.role == segment.kind]
+    if segment.kind == critical_path.LINK:
+        return [step for step in steps if step.target == segment.target]
+    if segment.kind == critical_path.COMPILE:
+        own = [step for step in steps if step.target == segment.target]
+        exact = [step for step in own if step.source == segment.detail]
+        return exact or own
+    return [step for step in steps if critical_path.custom_name(step) == segment.detail]
