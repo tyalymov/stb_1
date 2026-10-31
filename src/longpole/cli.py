@@ -21,6 +21,7 @@ commands:
     analyze          report on a run: totals, phases, slowest items, critical path, parallelism,
                      sizes
     export           write a run as a Perfetto trace or a Markdown snapshot
+    runs             list stored runs; 'runs show' prints one, 'runs prune' deletes old ones
 """
 
 from __future__ import annotations
