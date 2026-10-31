@@ -37,6 +37,7 @@ packages = ["src/longpole"]
 
 [dependency-groups]
 dev = [
+    "ninja>=1.13.2",
     "pre-commit>=4.7.0",
     "pydoclint>=0.12.0",
     "pyright>=1.1.414",

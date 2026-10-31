@@ -1,4 +1,4 @@
-.PHONY: lint typecheck test check format
+.PHONY: lint typecheck test check format cmake-tools
 
 lint:
 	uv run ruff check .
@@ -16,3 +16,6 @@ check: lint typecheck test
 format:
 	uv run ruff format .
 	uv run ruff check --fix .
+
+cmake-tools:
+	grep -v "^#" scripts/cmake-versions.txt | xargs -n1 scripts/install-cmake.sh
