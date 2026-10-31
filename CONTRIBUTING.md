@@ -68,7 +68,7 @@ inside pytest by importing `main` and passing a list of arguments.
 
 ```python
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the CLI and turn every outcome into an exit code."""
+    """Run the command line and turn every outcome into an exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
     try:
         cli = parse_cli(args)
@@ -76,20 +76,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         env = load_env()
         with context.activate(cli, env):
             return COMMANDS[cli.command].run()
+    except HelpPrinted:
+        return 0
     except UsageError as exc:
-        sys.stderr.write(f"{exc}\n")
-        return 2
+        output.stderr(str(exc))
+        return exc.exit_code
     except LongpoleError as exc:
         log.error("%s", exc)
         return exc.exit_code
+    except KeyboardInterrupt:
+        return EXIT_INTERRUPTED
     except Exception:
         log.exception("unexpected error")
-        return 70
+        return EXIT_UNEXPECTED
 
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
 ```
+
+This is `longpole/cli.py` verbatim, minus the full docstring.
 
 The rules behind that shape:
 
@@ -99,8 +105,8 @@ The rules behind that shape:
 - `parse_cli` uses argparse with a git-like layout: global flags first
   (`--log-level`, `--store`, `--json`), then a command and its flags. The
   parser never exits the process. Parse errors become `UsageError` (exit
-  code 2) and `--help` prints the help and returns 0, otherwise `main` could
-  not be called from a test.
+  code 2); `--help` prints the help and raises `HelpPrinted`, which `main`
+  turns into exit code 0. Otherwise `main` could not be called from a test.
 - `load_env` reads everything from the environment in one place:
   environment variables, XDG paths, tool versions.
 - `CliConfig` and `EnvConfig` are frozen dataclasses. They are published
@@ -110,11 +116,17 @@ The rules behind that shape:
   Only `main` and tests call `activate`. The reset on exit is what lets a
   test call `main([...])` many times in one process without state leaking
   between calls.
-- Each command lives in its own file under `longpole/commands/` with two
-  functions: `register(subparsers)` adds the subparser and its flags, and
-  `run() -> int` does the work using `context.cli()` and `context.env()`.
-  `commands/__init__.py` holds the registry; the entry module only builds
-  the parser and dispatches.
+- Each command lives in its own file under `longpole/commands/` and exposes
+  one `Command` record (`longpole/command.py`): its `name`, one-line `help`,
+  a `description` paragraph and three functions. `register(parser)` adds the
+  command's own arguments to the subparser the entry point created for it.
+  `options_from(namespace)` turns the parsed arguments into the command's
+  own frozen options dataclass, so nothing downstream touches the untyped
+  `argparse.Namespace`. `run() -> int` does the work, reading
+  `context.cli()`, `context.env()` and its options back with
+  `context.options(Options)`, which checks the type. `commands/__init__.py`
+  holds the registry; the entry module only builds the parser and
+  dispatches.
 - Errors are a small hierarchy under `LongpoleError`, each with an
   `exit_code`. Low-level exceptions are wrapped at the layer boundary with
   a message a user can act on.
@@ -128,8 +140,9 @@ Use the standard `logging` module with one logger per module
 (`log = logging.getLogger(__name__)`). `main` configures logging once from
 `--log-level`; all log output goes to stderr. Standard output carries only
 the result of the command (tables, JSON) because tests and pipes parse it.
-`print` is allowed only in the output layer; ruff's `T20` rule flags it
-elsewhere.
+The output layer is `longpole/output.py`: `output.stdout(text)` for
+results, `output.stderr(text)` for messages to the person at the terminal.
+ruff's `T20` rule flags `print` anywhere in the package.
 
 ## Tests
 
