@@ -17,4 +17,7 @@ for name in query index snippet; do
     curl --silent --show-error --fail --location --output "$schemas_dir/$file" "$base/$file"
     echo "fetched $file @ $tag"
 done
+curl --silent --show-error --fail --location --output "$schemas_dir/CMAKE-LICENSE.txt" \
+    "https://gitlab.kitware.com/cmake/cmake/-/raw/$tag/LICENSE.rst"
+echo "fetched LICENSE.rst @ $tag"
 printf '%s\n' "$tag" > "$schemas_dir/VERSION"

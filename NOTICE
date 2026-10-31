@@ -3,3 +3,8 @@ Copyright 2026 Timur Ialymov
 
 This product includes software developed by Timur Ialymov.
 Licensed under the Apache License, Version 2.0; see LICENSE.
+
+This product bundles the CMake instrumentation JSON schemas
+(src/longpole/cmake/schemas/*.json), copyright Kitware, Inc. and
+Contributors, licensed under the BSD 3-Clause License; see
+src/longpole/cmake/schemas/CMAKE-LICENSE.txt.

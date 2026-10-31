@@ -10,4 +10,6 @@ Refresh with `scripts/refresh-schemas.sh [tag]` and commit the result. The
 validator in `longpole.cmake.schema` reads these files from the installed
 package and never touches the network.
 
-The schemas are part of CMake and carry its BSD 3-Clause licence.
+The schemas are part of CMake and carry its BSD 3-Clause licence; the
+licence text and copyright notice (CMake's `LICENSE.rst`) are reproduced in
+`CMAKE-LICENSE.txt` next to them, as that licence requires.
