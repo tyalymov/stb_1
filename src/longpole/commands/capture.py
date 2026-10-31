@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from longpole import __version__, context, env, output, units
+from longpole.analyzers.critical_path import CriticalPath, critical_path
 from longpole.cmake import fileapi, snippets, tooling
 from longpole.command import Command
 from longpole.errors import CMakeToolError
@@ -223,9 +224,10 @@ def status_line(outcome: Outcome) -> str:
         outcome: What :func:`capture` did.
 
     Returns:
-        ``longpole: <hook> recorded as <id>: N steps, 1.6 s`` plus a hint
-        when the graph is pending or a reconfigure is needed; or
-        ``longpole: <hook>: empty index, nothing recorded``.
+        ``longpole: <hook> recorded as <id>: N steps, 1.6 s, critical path
+        1.2 s (74%)`` plus a hint when the graph is pending or a reconfigure
+        is needed; the critical path part is left out when there is none;
+        or ``longpole: <hook>: empty index, nothing recorded``.
     """
     if outcome.run is None:
         return f"longpole: {outcome.hook}: empty index, nothing recorded"
@@ -235,6 +237,9 @@ def status_line(outcome: Outcome) -> str:
         f"longpole: {run.manifest.hook} recorded as {run.manifest.run_id}: "
         f"{count} step{'s' if count != 1 else ''}, {units.duration(run.span_ms)}"
     )
+    path = critical_path(run)
+    if isinstance(path, CriticalPath):
+        text += f", critical path {units.duration(path.lower_bound_ms)} ({path.share:.0%})"
     hints: list[str] = []
     if outcome.needs_reconfigure:
         hints.append("run cmake again to record compile and link steps")

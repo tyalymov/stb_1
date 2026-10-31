@@ -18,8 +18,8 @@ commands:
                      --global
     capture          store the run an instrumentation index describes; CMake runs this at each hook
     doctor           check whether a build tree records its builds, and say what to fix if not
-    analyze          summarise a run: totals, phases, slowest targets, sources, custom commands and
-                     tests
+    analyze          report on a run: totals, phases, slowest items, critical path, parallelism,
+                     sizes
 """
 
 from __future__ import annotations

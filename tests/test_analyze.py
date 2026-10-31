@@ -64,14 +64,16 @@ def test_json_defaults_to_the_newest_run_and_accepts_references(
     store = _store_with(tmp_path, older, newer)
 
     assert main(["--store", str(store), "--json", "analyze"]) == 0
-    assert json.loads(capsys.readouterr().out)["run_id"] == "20261031T120100Z-000002"
+    assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120100Z-000002"
     assert main(["--store", str(store), "--json", "analyze", "latest~1"]) == 0
-    assert json.loads(capsys.readouterr().out)["run_id"] == "20261031T120000Z-000001"
+    assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-000001"
     assert main(["--store", str(store), "--json", "analyze", "20261031T120000Z"]) == 0
     report = json.loads(capsys.readouterr().out)
-    assert report["run_id"] == "20261031T120000Z-000001"
-    assert report["totals"]["step_count"] == 8
-    assert report["phases"][0]["role"] == "configure"
+    assert report["summary"]["run_id"] == "20261031T120000Z-000001"
+    assert report["summary"]["totals"]["step_count"] == 8
+    assert report["summary"]["phases"][0]["role"] == "configure"
+    assert report["critical_path"]["available"] is True
+    assert report["utilization"]["peak_parallelism"] == 1
 
 
 def test_top_limits_the_tables(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -79,8 +81,9 @@ def test_top_limits_the_tables(tmp_path: Path, capsys: pytest.CaptureFixture[str
     store = _store_with(tmp_path, sample_run())
     assert main(["--store", str(store), "--json", "analyze", "--top", "1"]) == 0
     report = json.loads(capsys.readouterr().out)
-    assert len(report["slowest_targets"]) == 1
-    assert len(report["slowest_sources"]) == 1
+    assert len(report["summary"]["slowest_targets"]) == 1
+    assert len(report["summary"]["slowest_sources"]) == 1
+    assert len(report["sizes"]["largest"]) == 1
 
 
 def test_inside_a_build_tree_the_default_is_that_trees_newest_run(
@@ -104,7 +107,7 @@ def test_inside_a_build_tree_the_default_is_that_trees_newest_run(
 
     monkeypatch.chdir(tree / "CMakeFiles")
     assert main(["--store", str(store), "--json", "analyze"]) == 0
-    assert json.loads(capsys.readouterr().out)["run_id"] == "20261031T120000Z-000001"
+    assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-000001"
 
 
 def test_tree_without_runs_is_an_error_not_a_fallback(
@@ -148,3 +151,6 @@ def test_real_chain_run_renders_its_targets_and_custom_commands(
     for name in ("a", "b", "c"):
         assert f"\n{name} " in text or f" {name} " in text
     assert "gen_a.c" in text
+    assert "critical path: " in text and "lower bound" in text
+    assert "parallelism: peak" in text
+    assert "artifacts: " in text

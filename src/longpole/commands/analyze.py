@@ -1,4 +1,4 @@
-"""``longpole analyze``: the summary of one stored run.
+"""``longpole analyze``: the report of one stored run.
 
 Without a run reference the command picks the newest run of the build tree
 the working directory is in, so ``cd build && longpole analyze`` shows the
@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 from longpole import context, output
-from longpole.analyzers.summary import summarize
+from longpole.analyzers.report import build_report, to_json
 from longpole.cmake import tooling
 from longpole.command import Command
 from longpole.errors import UnknownRunError
@@ -74,7 +74,7 @@ def options_from(namespace: argparse.Namespace) -> AnalyzeOptions:
 
 
 def run() -> int:
-    """Load the run, summarise it and print the summary.
+    """Load the run, analyse it and print the report.
 
     Returns:
         0 on success.
@@ -88,11 +88,11 @@ def run() -> int:
     env = context.env()
     tree = tooling.find_build_tree(env.cwd)
     store = RunStore(resolve_store(cli.store, build_dir=tree, environ=env.environ))
-    summary = summarize(load_run(store, options.run, tree), top=options.top)
+    report = build_report(load_run(store, options.run, tree), top=options.top)
     if cli.json_output:
-        output.stdout(json.dumps(asdict(summary), indent=2))
+        output.stdout(json.dumps(to_json(report), indent=2))
     else:
-        output.stdout(terminal.format_summary(summary))
+        output.stdout(terminal.format_report(report))
     return 0
 
 
@@ -134,10 +134,12 @@ def load_run(store: RunStore, ref: str | None, tree: Path | None) -> Run:
 
 COMMAND = Command(
     name="analyze",
-    help="summarise a run: totals, phases, slowest targets, sources, custom commands and tests",
+    help="report on a run: totals, phases, slowest items, critical path, parallelism, sizes",
     description=(
-        "Print the summary of one stored run. Defaults to the newest run of the build tree "
-        "you are in, or the newest run in the store."
+        "Print the report of one stored run: totals and phases, the slowest targets, sources, "
+        "custom commands and tests, the critical path, the parallelism over time and the "
+        "artifact sizes. Defaults to the newest run of the build tree you are in, or the "
+        "newest run in the store."
     ),
     register=register,
     options_from=options_from,

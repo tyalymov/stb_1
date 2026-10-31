@@ -198,11 +198,15 @@ def test_status_line_names_the_run_and_the_hints() -> None:
         hook="postCMakeBuild", run=run, directory=None, graph_pending=False, needs_reconfigure=False
     )
     assert capture.status_line(plain) == (
-        "longpole: postCMakeBuild recorded as 20261031T120000Z-abc123: 8 steps, 2.4 s "
-        "(longpole analyze)"
+        "longpole: postCMakeBuild recorded as 20261031T120000Z-abc123: 8 steps, 2.4 s, "
+        "critical path 180 ms (7%) (longpole analyze)"
     )
     hinted = capture.Outcome(
-        hook="postCMakeBuild", run=run, directory=None, graph_pending=True, needs_reconfigure=True
+        hook="postCMakeBuild",
+        run=sample_run(with_graph=False),
+        directory=None,
+        graph_pending=True,
+        needs_reconfigure=True,
     )
     assert capture.status_line(hinted) == (
         "longpole: postCMakeBuild recorded as 20261031T120000Z-abc123: 8 steps, 2.4 s; "
