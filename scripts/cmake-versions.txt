@@ -1,6 +1,0 @@
-# CMake releases the test suite runs against. One per line; `make cmake-tools`
-# installs them all under .tools/cmake/. Keep in step with the matrix in
-# .github/workflows/ci.yml.
-4.3.6
-4.4.5
-4.5.0-rc2
