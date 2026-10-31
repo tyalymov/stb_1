@@ -24,11 +24,11 @@ from tests.conftest import BuiltChain, cmake_version_of
 
 
 @pytest.mark.cmake
-def test_describe_reports_version_and_data_version(each_cmake: Path) -> None:
-    """Every installed CMake reports its version; the data version follows the release line."""
-    info = describe(each_cmake)
-    expected_version = cmake_version_of(each_cmake)
-    assert info.executable == each_cmake
+def test_describe_reports_version_and_data_version(cmake_binary: Path) -> None:
+    """The CMake under test reports its version; the data version follows the release line."""
+    info = describe(cmake_binary)
+    expected_version = cmake_version_of(cmake_binary)
+    assert info.executable == cmake_binary
     assert info.version_tuple == expected_version
     assert info.version.startswith(".".join(map(str, expected_version)))
     assert info.supports_instrumentation
@@ -36,9 +36,9 @@ def test_describe_reports_version_and_data_version(each_cmake: Path) -> None:
 
 
 @pytest.mark.cmake
-def test_config_dir_is_an_absolute_unescaped_path(each_cmake: Path) -> None:
+def test_config_dir_is_an_absolute_unescaped_path(cmake_binary: Path) -> None:
     """``--print-config-dir`` escapes spaces; the result is a plain absolute path."""
-    directory = config_dir(each_cmake)
+    directory = config_dir(cmake_binary)
     assert directory.is_absolute()
     assert "\\" not in str(directory)
 
