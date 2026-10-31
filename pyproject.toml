@@ -34,3 +34,77 @@ path = "src/longpole/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/longpole"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.7.0",
+    "pydoclint>=0.12.0",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = [".tools"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import order
+    "UP",       # modern syntax for the supported Python range
+    "B",        # likely bugs
+    "C4",       # comprehensions
+    "SIM",      # simplifications
+    "RET",      # return consistency
+    "ARG",      # unused arguments
+    "PTH",      # pathlib over os.path
+    "D",        # docstrings: every public and private function and class has one
+    "N",        # naming
+    "RUF",      # ruff's own checks
+    "T20",      # print(): stdout belongs to the output layer only
+]
+ignore = [
+    "D203",  # "one blank line before class docstring" fights D211; Google style wants no blank line
+    "D213",  # "summary on second line" fights D212; Google style starts the summary on the first line
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ARG001"]  # pytest fixtures arrive as parameters that the body may not touch
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pyright]
+include = ["src", "tests"]
+exclude = [".venv", ".tools", "**/__pycache__"]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+venvPath = "."
+venv = ".venv"
+
+[tool.pydoclint]
+style = "google"
+exclude = '\.venv|\.tools|tests'
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-yield-types = false
+skip-checking-short-docstrings = false
+allow-init-docstring = true
+require-return-section-when-returning-nothing = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers --strict-config"
+xfail_strict = true
+markers = [
+    "cmake: needs a CMake binary; set LONGPOLE_CMAKE or have cmake on PATH",
+    "slow: runs real configure/build/test cycles; deselect with -m 'not slow'",
+]
