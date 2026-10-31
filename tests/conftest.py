@@ -5,11 +5,17 @@ from __future__ import annotations
 import os
 import re
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
-from tests.support.cmake import CMakeProject
+from tests.support.cmake import (
+    CapturedIndex,
+    CMakeProject,
+    InstrumentationQuery,
+    instrumentation_options,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MINIMUM_VERSION = (4, 3)
@@ -224,3 +230,59 @@ def each_cmake(request: pytest.FixtureRequest) -> Path:
     """
     cmake: Path = request.param
     return cmake
+
+
+@dataclass(frozen=True, kw_only=True)
+class BuiltChain:
+    """The ``chain`` fixture configured and built once with a particular CMake.
+
+    Attributes:
+        project: The build tree; still usable for further CMake invocations.
+        version: Version of the CMake that built it.
+        captures: Indexes the callback saved: ``postGenerate`` then ``postCMakeBuild``.
+    """
+
+    project: CMakeProject
+    version: tuple[int, int, int]
+    captures: tuple[CapturedIndex, ...]
+
+    @property
+    def build_capture(self) -> CapturedIndex:
+        """The ``postCMakeBuild`` index, which carries the compile, link and custom steps."""
+        return next(capture for capture in self.captures if capture.hook == "postCMakeBuild")
+
+
+_BUILT_CHAINS: dict[Path, BuiltChain] = {}
+
+
+@pytest.fixture
+def built_chain(each_cmake: Path, tmp_path_factory: pytest.TempPathFactory) -> BuiltChain:
+    """The chain fixture built once per installed CMake version and shared by read-only tests.
+
+    A full configure and build costs a couple of seconds per version; tests
+    that only parse what CMake wrote share one build instead of repeating it.
+    Tests that modify the tree must not use this fixture.
+
+    Args:
+        each_cmake: The CMake binary for this parametrised run.
+        tmp_path_factory: pytest's session-wide temporary directory factory.
+
+    Returns:
+        The built project and everything the callback captured.
+    """
+    if each_cmake not in _BUILT_CHAINS:
+        version = cmake_version_of(each_cmake)
+        project = make_project("chain", tmp_path_factory.mktemp("built-chain"), each_cmake)
+        project.write_query(
+            InstrumentationQuery(
+                hooks=("postGenerate", "postCMakeBuild"),
+                callbacks=(project.callback,),
+                options=instrumentation_options(version),
+            )
+        )
+        project.configure()
+        project.build()
+        _BUILT_CHAINS[each_cmake] = BuiltChain(
+            project=project, version=version, captures=tuple(project.captured())
+        )
+    return _BUILT_CHAINS[each_cmake]

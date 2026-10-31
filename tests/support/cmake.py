@@ -18,6 +18,25 @@ from typing import Any
 
 CAPTURE_STUB = Path(__file__).with_name("capture_stub.py")
 
+
+def instrumentation_options(version: tuple[int, int, int]) -> tuple[str, ...]:
+    """Query options a given CMake accepts, richest first.
+
+    ``processMetrics`` exists from 4.5 on; asking an older CMake for it would
+    make it ignore the whole query, so the set depends on the version.
+
+    Args:
+        version: ``(major, minor, patch)`` of the CMake that will read the query.
+
+    Returns:
+        Option names to put in the query.
+    """
+    options = ["staticSystemInformation", "dynamicSystemInformation"]
+    if version[:2] >= (4, 5):
+        options.append("processMetrics")
+    return tuple(options)
+
+
 Json = dict[str, Any]  # a parsed JSON object; the shape is CMake's, not ours
 
 

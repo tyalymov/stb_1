@@ -19,7 +19,9 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "jsonschema>=4.26.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/tyalymov/longpole"
