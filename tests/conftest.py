@@ -211,24 +211,24 @@ _BUILT_CHAINS: dict[Path, BuiltChain] = {}
 
 
 @pytest.fixture
-def built_chain(each_cmake: Path, tmp_path_factory: pytest.TempPathFactory) -> BuiltChain:
-    """The chain fixture built once per installed CMake version and shared by read-only tests.
+def built_chain(cmake_binary: Path, tmp_path_factory: pytest.TempPathFactory) -> BuiltChain:
+    """The chain fixture built once per session and shared by read-only tests.
 
-    A full configure and build costs a couple of seconds per version; tests
-    that only parse what CMake wrote share one build instead of repeating it.
-    The File API query is in place before configure, so the reply exists too.
-    Tests that modify the tree must not use this fixture.
+    A full configure and build costs a couple of seconds; tests that only
+    parse what CMake wrote share one build instead of repeating it. The File
+    API query is in place before configure, so the reply exists too. Tests
+    that modify the tree must not use this fixture.
 
     Args:
-        each_cmake: The CMake binary for this parametrised run.
+        cmake_binary: The session's CMake.
         tmp_path_factory: pytest's session-wide temporary directory factory.
 
     Returns:
         The built project and everything the callback captured.
     """
-    if each_cmake not in _BUILT_CHAINS:
-        version = cmake_version_of(each_cmake)
-        project = make_project("chain", tmp_path_factory.mktemp("built-chain"), each_cmake)
+    if cmake_binary not in _BUILT_CHAINS:
+        version = cmake_version_of(cmake_binary)
+        project = make_project("chain", tmp_path_factory.mktemp("built-chain"), cmake_binary)
         project.write_query(
             InstrumentationQuery(
                 hooks=("postGenerate", "postCMakeBuild"),
@@ -239,10 +239,10 @@ def built_chain(each_cmake: Path, tmp_path_factory: pytest.TempPathFactory) -> B
         fileapi.write_query(project.build_dir)
         project.configure()
         project.build()
-        _BUILT_CHAINS[each_cmake] = BuiltChain(
+        _BUILT_CHAINS[cmake_binary] = BuiltChain(
             project=project, version=version, captures=tuple(project.captured())
         )
-    return _BUILT_CHAINS[each_cmake]
+    return _BUILT_CHAINS[cmake_binary]
 
 
 @pytest.fixture
