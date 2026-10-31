@@ -25,6 +25,9 @@ dependencies = [
     "zstandard>=0.25.0",
 ]
 
+[project.scripts]
+longpole = "longpole.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/tyalymov/longpole"
 Issues = "https://github.com/tyalymov/longpole/issues"
@@ -82,6 +85,9 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ARG001"]  # pytest fixtures arrive as parameters that the body may not touch
+# The module docstring of the entry point is the `--help` output verbatim, which
+# starts with a wrapped usage block rather than a one-line summary.
+"src/longpole/cli.py" = ["D205", "D415"]
 
 [tool.ruff.format]
 docstring-code-format = true

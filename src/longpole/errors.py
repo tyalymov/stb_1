@@ -20,6 +20,19 @@ class LongpoleError(Exception):
     exit_code: int = 1
 
 
+class UsageError(LongpoleError):
+    """The command line could not be parsed.
+
+    The message is argparse's usage text plus the complaint, ready to print
+    to standard error as is.
+
+    Attributes:
+        exit_code: 2, the convention for misuse of a command-line program.
+    """
+
+    exit_code = 2
+
+
 class SchemaError(LongpoleError):
     """A CMake instrumentation file does not match its published JSON schema.
 
