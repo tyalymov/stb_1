@@ -333,7 +333,9 @@ class Manifest:
         tool_version: longpole version that wrote the dump.
         hook: Hook that produced the index: ``postCMakeBuild``, ``postCTest``,
             ``manual`` and so on.
-        build_dir: Build tree the data came from, as CMake reported it.
+        build_dir: Build tree the data came from, with symlinks resolved so
+            two spellings of one directory compare equal (``/var`` and
+            ``/private/var`` on macOS).
         data_version: Version of the instrumentation data.
         environment: Machine and checkout state.
         labels: Free-form tags, e.g. ``ci:<run id>`` or a user label.

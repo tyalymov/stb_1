@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -169,6 +170,71 @@ def read_cache(build_dir: Path) -> CacheInfo:
         source_dir=Path(source) if source else None,
         cmake_version=version,
     )
+
+
+def query_files(build_dir: Path, *, config_dir: Path | None = None) -> tuple[Path, ...]:
+    """Instrumentation query files that apply to a build tree.
+
+    Args:
+        build_dir: The build tree; its own ``.cmake/instrumentation/v1/query``
+            is searched, including CMake's ``generated`` subdirectory.
+        config_dir: The user-level configuration directory, whose queries
+            apply to every tree; skipped when ``None``.
+
+    Returns:
+        Existing ``*.json`` files, tree first, sorted within each place.
+    """
+    places = [build_dir / ".cmake" / "instrumentation" / "v1" / "query"]
+    if config_dir is not None:
+        places.append(config_dir / "instrumentation" / "v1" / "query")
+    found: list[Path] = []
+    for place in places:
+        if place.is_dir():
+            found.extend(sorted(place.glob("*.json")))
+            found.extend(sorted((place / "generated").glob("*.json")))
+    return tuple(found)
+
+
+def last_generate_time(build_dir: Path) -> float | None:
+    """When the build system of a tree was last generated.
+
+    ``CMakeFiles/cmake.check_cache`` is rewritten by every generate of the
+    Makefile and Ninja generators; ``CMakeCache.txt`` is not touched when a
+    reconfigure changes nothing, so it only serves as a fallback.
+
+    Args:
+        build_dir: The build tree.
+
+    Returns:
+        Modification time as seconds since the epoch, or ``None`` for a tree
+        that was never configured.
+    """
+    for marker in (build_dir / "CMakeFiles" / "cmake.check_cache", build_dir / "CMakeCache.txt"):
+        if marker.is_file():
+            return marker.stat().st_mtime
+    return None
+
+
+def generated_before(build_dir: Path, queries: Iterable[Path]) -> bool:
+    """Whether the build system predates the newest of the given query files.
+
+    The launcher that records compile, link and custom steps is written
+    into the build system at generate time, so a query newer than the last
+    generate is only half in effect until the next ``cmake`` run.
+
+    Args:
+        build_dir: The build tree.
+        queries: Query files that apply to it.
+
+    Returns:
+        ``True`` when the tree is configured and at least one query file is
+        newer than its last generate; ``False`` for an unconfigured tree or
+        no queries.
+    """
+    generated_at = last_generate_time(build_dir)
+    if generated_at is None:
+        return False
+    return any(query.stat().st_mtime > generated_at for query in queries if query.is_file())
 
 
 def data_version_for_line(version_tuple: tuple[int, int, int]) -> DataVersion | None:

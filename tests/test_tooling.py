@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,9 @@ from longpole.cmake.tooling import (
     config_dir,
     data_version_for_line,
     describe,
+    generated_before,
+    last_generate_time,
+    query_files,
     read_cache,
 )
 from longpole.errors import CMakeToolError
@@ -96,3 +100,57 @@ def test_real_cache_names_the_configuring_cmake(built_chain: BuiltChain) -> None
     assert cache.source_dir is not None
     assert cache.source_dir.resolve() == built_chain.project.source_dir.resolve()
     assert cache.cmake_version == ".".join(map(str, built_chain.version))
+
+
+def test_query_files_lists_tree_and_user_queries(tmp_path: Path) -> None:
+    """Tree queries come first, including CMake's generated ones, then the user-level ones."""
+    tree_query_dir = tmp_path / "build" / ".cmake" / "instrumentation" / "v1" / "query"
+    (tree_query_dir / "generated").mkdir(parents=True)
+    (tree_query_dir / "longpole.json").write_text("{}", encoding="utf-8")
+    (tree_query_dir / "generated" / "ctest.json").write_text("{}", encoding="utf-8")
+    user_query_dir = tmp_path / "config" / "instrumentation" / "v1" / "query"
+    user_query_dir.mkdir(parents=True)
+    (user_query_dir / "longpole.json").write_text("{}", encoding="utf-8")
+    (user_query_dir / "notes.txt").write_text("ignored", encoding="utf-8")
+
+    found = query_files(tmp_path / "build", config_dir=tmp_path / "config")
+    assert found == (
+        tree_query_dir / "longpole.json",
+        tree_query_dir / "generated" / "ctest.json",
+        user_query_dir / "longpole.json",
+    )
+    assert query_files(tmp_path / "build") == found[:2]
+    assert query_files(tmp_path / "elsewhere") == ()
+
+
+def test_generated_before_compares_query_and_generate_times(tmp_path: Path) -> None:
+    """A query newer than the last generate means the launcher is not in the build system yet.
+
+    The generate time comes from CMakeFiles/cmake.check_cache, because a
+    reconfigure that changes nothing leaves CMakeCache.txt untouched.
+    """
+    build = tmp_path / "build"
+    (build / "CMakeFiles").mkdir(parents=True)
+    cache = build / "CMakeCache.txt"
+    cache.write_text("", encoding="utf-8")
+    check = build / "CMakeFiles" / "cmake.check_cache"
+    check.write_text("", encoding="utf-8")
+    query = tmp_path / "longpole.json"
+    query.write_text("{}", encoding="utf-8")
+    configured_at = 1_700_000_000.0
+
+    os.utime(cache, (configured_at, configured_at))
+    os.utime(check, (configured_at, configured_at))
+    os.utime(query, (configured_at + 60, configured_at + 60))
+    assert generated_before(build, [query]) is True
+
+    os.utime(check, (configured_at + 120, configured_at + 120))
+    assert generated_before(build, [query]) is False
+
+    check.unlink()
+    assert last_generate_time(build) == configured_at
+    assert generated_before(build, [query]) is True
+
+    assert generated_before(build, []) is False
+    assert generated_before(tmp_path / "unconfigured", [query]) is False
+    assert last_generate_time(tmp_path / "unconfigured") is None

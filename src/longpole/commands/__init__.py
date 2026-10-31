@@ -9,7 +9,9 @@ entry point builds the argument parser from this mapping and dispatches to
 from __future__ import annotations
 
 from longpole.command import Command
-from longpole.commands import enable
+from longpole.commands import capture, enable
 
-COMMANDS: dict[str, Command] = {command.name: command for command in (enable.COMMAND,)}
+COMMANDS: dict[str, Command] = {
+    command.name: command for command in (enable.COMMAND, capture.COMMAND)
+}
 """Commands by name, in the order ``--help`` lists them."""

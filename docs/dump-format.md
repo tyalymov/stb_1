@@ -29,7 +29,7 @@ random hex digits.
 | `created_at` | string | Capture time, ISO 8601, UTC. |
 | `tool_version` | string | longpole version that wrote the dump. |
 | `hook` | string | CMake hook that produced the index (`postCMakeBuild`, `postCTest`, `manual`, ...). |
-| `build_dir` | string | Build tree as CMake reported it in the index. |
+| `build_dir` | string | Build tree from the index, with symlinks resolved (`/private/var/...` rather than `/var/...` on macOS). |
 | `data_version` | object | `{"major": 1, "minor": N}`; N is 0 for CMake 4.3, 1 for 4.4, 2 for 4.5. |
 | `environment` | object | See below. |
 | `labels` | array of strings | Free-form tags such as `ci:<run id>`. |
