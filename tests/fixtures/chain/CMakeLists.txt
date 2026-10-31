@@ -4,9 +4,15 @@ project(chain C)
 # Three targets in a strict chain: a <- b <- c. Each target's only source is
 # produced by generate.cmake, which sleeps for a known time first and whose
 # custom command depends on the previous target's artifact. Nothing here can
-# run in parallel, so the critical path of this build is the three sleeps
-# (0.6 + 0.3 + 0.2 seconds) plus three compiles and three links. Tests use
-# those numbers as the expected answer.
+# run in parallel, so the build really takes the three sleeps
+# (0.6 + 0.3 + 0.2 seconds) plus three compiles and three links. The summary
+# and utilization tests use those numbers as the expected answer.
+#
+# The critical path test does not: the target graph records that b depends
+# on a, not that b's generator waits for a's artifact, so the lower bound
+# longpole computes lets the generators start together and counts only the
+# longest one. The real build is slower than the bound, which is the
+# direction a lower bound may miss. See test_critical_path.py.
 #
 # The libraries are shared on purpose: a static library is created by two
 # launched commands (ar, then ranlib) and therefore yields two link snippets,
