@@ -26,3 +26,19 @@ class SchemaError(LongpoleError):
     The message names the file kind, the offending location inside the
     document and the validator's complaint, so it can be shown as is.
     """
+
+
+class IndexFormatError(LongpoleError):
+    """An instrumentation index file cannot be read as v1 data.
+
+    Raised for a file that is not JSON or not an object, or whose fields do
+    not have the types the v1 format promises. Schema violations proper come
+    as :class:`SchemaError`.
+    """
+
+
+class SnippetFormatError(LongpoleError):
+    """An instrumentation snippet file cannot be read as v1 data.
+
+    Same contract as :class:`IndexFormatError`, for snippets.
+    """
