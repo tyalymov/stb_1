@@ -10,7 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from longpole.cmake import fileapi
+from longpole.cmake import fileapi, snippets
+from longpole.env import collect
+from longpole.model import Manifest, Run
+from longpole.store import new_run_id
 from tests.support.cmake import (
     CapturedIndex,
     CMakeProject,
@@ -289,3 +292,35 @@ def built_chain(each_cmake: Path, tmp_path_factory: pytest.TempPathFactory) -> B
             project=project, version=version, captures=tuple(project.captured())
         )
     return _BUILT_CHAINS[each_cmake]
+
+
+@pytest.fixture
+def chain_run(built_chain: BuiltChain) -> Run:
+    """The chain fixture's build run assembled from what CMake wrote, graph included.
+
+    Args:
+        built_chain: The shared build.
+
+    Returns:
+        A run as `longpole capture` would have stored it.
+    """
+    capture = built_chain.build_capture
+    index = snippets.read_index(
+        capture.directory / "index.json", data_dir=capture.directory / "snippets"
+    )
+    reply = fileapi.read_reply(built_chain.project.build_dir)
+    assert reply is not None
+    return Run(
+        manifest=Manifest(
+            run_id=new_run_id(),
+            created_at="2026-10-31T12:00:00+00:00",
+            tool_version="test",
+            hook=index.hook,
+            build_dir=str(index.build_dir),
+            data_version=index.version,
+            environment=collect(built_chain.project.build_dir, reply=reply),
+        ),
+        steps=snippets.read_steps(index),
+        graph=fileapi.graph_from_reply(reply),
+        system=index.system,
+    )
