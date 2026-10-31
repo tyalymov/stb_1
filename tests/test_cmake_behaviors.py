@@ -59,7 +59,9 @@ def test_hooks_without_callbacks_throw_the_data_away(tmp_path: Path, cmake_binar
     assert not index_dir.exists() or list(index_dir.iterdir()) == []
 
 
-def test_without_hooks_snippets_accumulate_across_builds(tmp_path: Path, cmake_binary: Path) -> None:
+def test_without_hooks_snippets_accumulate_across_builds(
+    tmp_path: Path, cmake_binary: Path
+) -> None:
     """An options-only query collects data that nothing ever indexes or deletes.
 
     The first build of the chain leaves twelve snippets (configure, generate,
@@ -88,7 +90,9 @@ def test_post_generate_indexes_configure_and_generate(tmp_path: Path, cmake_bina
     assert captured[0].roles() == {"configure": 1, "generate": 1}
 
 
-def test_cmake_install_records_one_cmake_install_snippet(tmp_path: Path, cmake_binary: Path) -> None:
+def test_cmake_install_records_one_cmake_install_snippet(
+    tmp_path: Path, cmake_binary: Path
+) -> None:
     """`cmake --install` fires postCMakeInstall with a cmakeInstall snippet and nothing else.
 
     The per-script `install` role the manual lists did not appear for this
