@@ -42,3 +42,11 @@ class SnippetFormatError(LongpoleError):
 
     Same contract as :class:`IndexFormatError`, for snippets.
     """
+
+
+class CMakeToolError(LongpoleError):
+    """Running or reading the ``cmake`` executable failed.
+
+    Raised when the binary cannot be started, exits non-zero, times out or
+    prints something that is not the expected JSON or text.
+    """
