@@ -98,9 +98,8 @@ def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
     assert build_run.manifest.labels == ("nightly", "ci:4242")
     assert store.read("label:nightly").manifest.hook == "postCTest", "label: picks the newest"
     assert build_run.manifest.build_dir == str(project.build_dir.resolve())
-    assert (
-        build_run.manifest.data_version.minor == {3: 0, 4: 1, 5: 2}[cmake_version_of(cmake_binary)[1]]
-    )
+    expected_minor = {3: 0, 4: 1, 5: 2}[cmake_version_of(cmake_binary)[1]]
+    assert build_run.manifest.data_version.minor == expected_minor
     assert build_run.graph is not None
     assert sorted(target.name for target in build_run.graph.targets) == ["a", "b", "c"]
     assert build_run.manifest.environment.generator == "Ninja"
