@@ -24,12 +24,12 @@ Observed on 2026-10-31, macOS 26 (arm64), Ninja generator, CMake 4.3.6,
 | 12 | Which data version does each line write? | 4.3 writes 1.0, 4.4 writes 1.1, 4.5 (rc2) writes 1.2. The index carries the same version as the snippets. | The reader keys its handling on the snippet version, not on the CMake version string. |
 | 13 | Which file marks the last generate? | `CMakeCache.txt` is left untouched by a reconfigure that changes nothing; `CMakeFiles/cmake.check_cache` is rewritten by every generate. | Use `cmake.check_cache` as the generate timestamp, with `CMakeCache.txt` as the fallback. |
 
-To rerun the observations against every pinned release:
+To rerun the observations:
 
 ```sh
-make cmake-tools
 uv run pytest tests/test_cmake_behaviors.py
 ```
 
-Only versions found under `.tools/cmake` and on `PATH` are exercised; the
-`each_cmake` fixture in `tests/conftest.py` discovers them.
+They run against the `cmake` on `PATH`, or the one `LONGPOLE_CMAKE` points
+to. CI runs them on every release line in its matrix
+(`.github/workflows/ci.yml`), which is where a new release shows up first.

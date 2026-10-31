@@ -187,56 +187,6 @@ def with_tests(tmp_path: Path, cmake_binary: Path) -> CMakeProject:
     return make_project("with_tests", tmp_path, cmake_binary)
 
 
-def _version_string(cmake: Path) -> str:
-    """Format ``cmake --version`` as ``X.Y.Z``, dropping any release-candidate suffix.
-
-    Args:
-        cmake: Executable to query.
-
-    Returns:
-        Dotted version used as a test id.
-    """
-    return ".".join(map(str, cmake_version_of(cmake)))
-
-
-def installed_cmakes() -> list[Path]:
-    """Every CMake the suite can reach: pinned releases under ``.tools/cmake`` plus the default.
-
-    Pinned releases come from ``scripts/install-cmake.sh`` (macOS bundle or Linux
-    layout); the default is whatever :func:`_cmake_from_environment` finds. One
-    entry per distinct version, oldest first.
-
-    Returns:
-        Executable paths; empty when nothing is installed.
-    """
-    tools = Path(__file__).resolve().parents[1] / ".tools" / "cmake"
-    candidates = sorted(tools.glob("*/cmake-*/CMake.app/Contents/bin/cmake")) + sorted(
-        tools.glob("*/cmake-*/bin/cmake")
-    )
-    default = _cmake_from_environment()
-    if default is not None:
-        candidates.append(default)
-    by_version: dict[tuple[int, int, int], Path] = {}
-    for candidate in candidates:
-        if candidate.is_file():
-            by_version.setdefault(cmake_version_of(candidate), candidate)
-    return [by_version[version] for version in sorted(by_version)]
-
-
-@pytest.fixture(params=installed_cmakes(), ids=_version_string)
-def each_cmake(request: pytest.FixtureRequest) -> Path:
-    """One test run per installed CMake version, for behaviour that may differ between lines.
-
-    Args:
-        request: pytest's parametrization handle.
-
-    Returns:
-        Path to the ``cmake`` executable for this run.
-    """
-    cmake: Path = request.param
-    return cmake
-
-
 @dataclass(frozen=True, kw_only=True)
 class BuiltChain:
     """The ``chain`` fixture configured and built once with a particular CMake.
