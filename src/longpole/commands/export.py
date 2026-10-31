@@ -19,7 +19,7 @@ from longpole.cmake import tooling
 from longpole.command import Command
 from longpole.commands.analyze import load_run
 from longpole.errors import UsageError
-from longpole.exporters import perfetto
+from longpole.exporters import markdown, perfetto
 from longpole.store import RunStore, resolve_store
 
 log = logging.getLogger(__name__)
@@ -34,10 +34,12 @@ class ExportOptions:
     Attributes:
         run: Run reference, or ``None`` for the default choice.
         perfetto: Destination of the Perfetto trace, or ``None`` to skip it.
+        markdown: Destination of the Markdown snapshot, or ``None`` to skip it.
     """
 
     run: str | None
     perfetto: str | None
+    markdown: str | None
 
 
 def register(parser: argparse.ArgumentParser) -> None:
@@ -58,6 +60,12 @@ def register(parser: argparse.ArgumentParser) -> None:
         metavar="PATH",
         help="write a Chrome JSON trace for ui.perfetto.dev to PATH ('-' for standard output)",
     )
+    parser.add_argument(
+        "--markdown",
+        metavar="PATH",
+        help="write a Markdown snapshot for a CI job summary or check run to PATH "
+        "('-' for standard output)",
+    )
 
 
 def options_from(namespace: argparse.Namespace) -> ExportOptions:
@@ -69,7 +77,9 @@ def options_from(namespace: argparse.Namespace) -> ExportOptions:
     Returns:
         The options.
     """
-    return ExportOptions(run=namespace.run, perfetto=namespace.perfetto)
+    return ExportOptions(
+        run=namespace.run, perfetto=namespace.perfetto, markdown=namespace.markdown
+    )
 
 
 def run() -> int:
@@ -85,15 +95,20 @@ def run() -> int:
         OSError: A destination cannot be written.
     """
     options = context.options(ExportOptions)
-    if options.perfetto is None:
-        raise UsageError("export: choose at least one format, e.g. --perfetto trace.json")
+    if options.perfetto is None and options.markdown is None:
+        raise UsageError(
+            "export: choose at least one format, e.g. --perfetto trace.json or --markdown run.md"
+        )
     cli = context.cli()
     env = context.env()
     tree = tooling.find_build_tree(env.cwd)
     store = RunStore(resolve_store(cli.store, build_dir=tree, environ=env.environ))
     loaded = load_run(store, options.run, tree)
     report = build_report(loaded)
-    _write(options.perfetto, perfetto.format_trace(loaded, report), "Perfetto trace")
+    if options.perfetto is not None:
+        _write(options.perfetto, perfetto.format_trace(loaded, report), "Perfetto trace")
+    if options.markdown is not None:
+        _write(options.markdown, markdown.format_markdown(report), "Markdown snapshot")
     return 0
 
 
@@ -114,11 +129,12 @@ def _write(destination: str, text: str, what: str) -> None:
 
 COMMAND = Command(
     name="export",
-    help="write a run as a Perfetto trace",
+    help="write a run as a Perfetto trace or a Markdown snapshot",
     description=(
         "Render one stored run for another tool. --perfetto writes a Chrome JSON trace that "
-        "ui.perfetto.dev opens directly. Defaults to the newest run of the build tree you are "
-        "in, or the newest run in the store."
+        "ui.perfetto.dev opens directly; --markdown writes a snapshot for a CI job summary or "
+        "check run. Defaults to the newest run of the build tree you are in, or the newest "
+        "run in the store."
     ),
     register=register,
     options_from=options_from,
