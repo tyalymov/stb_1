@@ -73,10 +73,10 @@ def _roles(store: RunStore, hook: str) -> dict[str, int]:
 @pytest.mark.cmake
 @pytest.mark.slow
 def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
-    tmp_path: Path, each_cmake: Path
+    tmp_path: Path, cmake_binary: Path
 ) -> None:
     """Configure, build and ctest each leave one run; the build run carries everything."""
-    project = make_project("chain", tmp_path, each_cmake)
+    project = make_project("chain", tmp_path, cmake_binary)
     store_dir = tmp_path / "store"
     _instrument(project, store_dir, "postGenerate", "postCMakeBuild", "postCTest", label="nightly")
     fileapi.write_query(project.build_dir)
@@ -99,7 +99,7 @@ def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
     assert store.read("label:nightly").manifest.hook == "postCTest", "label: picks the newest"
     assert build_run.manifest.build_dir == str(project.build_dir.resolve())
     assert (
-        build_run.manifest.data_version.minor == {3: 0, 4: 1, 5: 2}[cmake_version_of(each_cmake)[1]]
+        build_run.manifest.data_version.minor == {3: 0, 4: 1, 5: 2}[cmake_version_of(cmake_binary)[1]]
     )
     assert build_run.graph is not None
     assert sorted(target.name for target in build_run.graph.targets) == ["a", "b", "c"]
