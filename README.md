@@ -221,10 +221,11 @@ make check              # lint, types, docstrings, tests
 
 The tests drive real CMake builds of small fixture projects and pin what
 each CMake release does, so they need CMake 4.3 or newer and a C and C++
-toolchain; `LONGPOLE_CMAKE` selects a `cmake` that is not first on `PATH`,
-and CI runs them on every release line. [CONTRIBUTING.md](CONTRIBUTING.md)
-has the rules for code and docstrings. [docs/demo.md](docs/demo.md) explains
-how the demo recording is made.
+toolchain; the dev container in `.devcontainer/` has both. `LONGPOLE_CMAKE`
+selects a `cmake` that is not first on `PATH`, and CI runs the tests on
+every release line. [CONTRIBUTING.md](CONTRIBUTING.md) has the rules for
+code and docstrings. [docs/demo.md](docs/demo.md) explains how the demo
+recording is made.
 
 ## License
 

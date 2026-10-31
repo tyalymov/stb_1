@@ -10,6 +10,12 @@ uv sync          # creates .venv with Python 3.11 and installs everything
 make check       # lint, typecheck, test; what CI runs
 ```
 
+The tests build small CMake projects, so they also need CMake 4.3 or newer
+and a C and C++ toolchain. Either install those, or open the repository in
+its dev container (`.devcontainer/`), which has them and runs `uv sync` on
+creation; Codespaces uses the same definition. `LONGPOLE_CMAKE` points the
+tests at a `cmake` that is not first on `PATH`.
+
 `make format` applies ruff's formatter and auto-fixes. `pre-commit install`
 runs the same checks before every commit.
 
