@@ -213,3 +213,34 @@ def test_status_line_names_the_run_and_the_hints() -> None:
         "run cmake again to record compile and link steps; target graph pending next "
         "configure (longpole analyze)"
     )
+
+
+@pytest.mark.cmake
+@pytest.mark.slow
+def test_build_tree_with_a_space_in_its_path_records_its_runs(
+    tmp_path: Path, cmake_binary: Path
+) -> None:
+    """CMake hands the index path to the callback intact even when the path has a space."""
+    import shutil
+
+    from tests.conftest import FIXTURES
+
+    root = tmp_path / "with space"
+    source = root / "src"
+    shutil.copytree(FIXTURES / "chain", source)
+    project = CMakeProject(
+        source_dir=source,
+        build_dir=root / "build dir",
+        cmake=cmake_binary,
+        generator="Ninja",
+        capture_root=root / "capture",
+    )
+    store_dir = root / "store"
+    _instrument(project, store_dir, "postCMakeBuild")
+    project.configure()
+    project.build()
+
+    store = RunStore(store_dir)
+    # Only the build hook is registered, so configure and generate land in its index too.
+    assert _roles(store, "postCMakeBuild") == {**CHAIN_BUILD_ROLES, "configure": 1, "generate": 1}
+    assert _newest(store, "postCMakeBuild").manifest.build_dir == str(project.build_dir.resolve())
