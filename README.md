@@ -216,14 +216,15 @@ measured by this project's tests, is in
 
 ```sh
 uv sync                 # environment with the pinned dependencies
-make cmake-tools        # CMake 4.3, 4.4 and 4.5 under .tools/ for the test matrix
 make check              # lint, types, docstrings, tests
 ```
 
 The tests drive real CMake builds of small fixture projects and pin what
-each CMake release does. [CONTRIBUTING.md](CONTRIBUTING.md) has the rules
-for code and docstrings. [docs/demo.md](docs/demo.md) explains how the demo
-recording is made.
+each CMake release does, so they need CMake 4.3 or newer and a C and C++
+toolchain; `LONGPOLE_CMAKE` selects a `cmake` that is not first on `PATH`,
+and CI runs them on every release line. [CONTRIBUTING.md](CONTRIBUTING.md)
+has the rules for code and docstrings. [docs/demo.md](docs/demo.md) explains
+how the demo recording is made.
 
 ## License
 
