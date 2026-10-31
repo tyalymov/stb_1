@@ -64,3 +64,6 @@ jobs:
       - id: cmake
         run: echo "bin=$(scripts/install-cmake.sh ${{ matrix.cmake }})" >> "$GITHUB_OUTPUT"
       - run: ${{ steps.cmake.outputs.bin }}/cmake --version
+      - run: uv run pytest -m cmake
+        env:
+          LONGPOLE_CMAKE: ${{ steps.cmake.outputs.bin }}
