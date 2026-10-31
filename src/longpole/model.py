@@ -124,7 +124,9 @@ class Step:
         outputs: Files the command produced, relative to ``working_dir``.
         output_sizes: Size in bytes of each entry of ``outputs``, same order.
         source: Source file of a compile step.
-        language: Language of a compile or link step, e.g. ``C`` or ``CXX``.
+        language: Language of a compile or link step as the snippet spells it,
+            ``C`` or ``C++``; the File API and CMake variables say ``CXX`` for
+            the same language.
         config: Build configuration such as ``Debug``; empty for single-config
             generators, ``None`` for roles that do not carry one.
         test_name: Name of the test for a ``test`` step.
