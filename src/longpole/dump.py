@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import json
 import shutil
+import tarfile
 from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
 from typing import cast
+
+import zstandard
 
 from longpole.errors import DumpFormatError
 from longpole.jsonfields import FieldError, Fields, Json, load_object
@@ -38,6 +41,9 @@ STEPS = "steps.jsonl"
 GRAPH = "graph.json"
 SYSTEM = "system.json"
 RAW = "raw"
+
+ARCHIVE_SUFFIX = ".tar.zst"
+"""Dumps travel as zstd-compressed tarballs: one directory, named after the run."""
 
 
 def write_run(
@@ -363,3 +369,84 @@ def _system(fields: Fields) -> SystemInfo:
         total_memory_mib=fields.optional_int("total_memory_mib"),
         raw=dict(raw) if raw is not None else {},
     )
+
+
+def pack(directory: Path, archive: Path) -> Path:
+    """Compress a dump directory into a ``.tar.zst`` archive.
+
+    The archive holds a single top-level directory named like ``directory``
+    (the run id), so unpacking next to other runs cannot collide with them.
+    Parent directories of ``archive`` are created. An existing file at
+    ``archive`` is replaced.
+
+    Args:
+        directory: A dump directory written by :func:`write_run`.
+        archive: Target file; conventionally ``<run_id>.tar.zst``.
+
+    Returns:
+        ``archive``.
+
+    Raises:
+        FileNotFoundError: ``directory`` has no ``manifest.json``.
+        OSError: The archive cannot be written.
+    """
+    if not (directory / MANIFEST).is_file():
+        raise FileNotFoundError(f"{directory} is not a run dump: no {MANIFEST}")
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    with (
+        archive.open("wb") as raw,
+        zstandard.ZstdCompressor().stream_writer(raw) as compressed,
+        tarfile.open(fileobj=compressed, mode="w|") as tar,
+    ):
+        tar.add(directory, arcname=directory.name)
+    return archive
+
+
+def unpack(archive: Path, destination: Path) -> Path:
+    """Extract a ``.tar.zst`` dump archive into ``destination``.
+
+    The archive is unpacked into a staging directory first and checked to
+    hold exactly one dump; only then is that dump moved to
+    ``destination / <run_id>``. ``destination`` may already contain other
+    dumps. Member paths that would escape the staging directory are rejected
+    by tarfile's ``data`` filter.
+
+    Args:
+        archive: File written by :func:`pack`.
+        destination: Directory to place the dump in; created if needed.
+
+    Returns:
+        The extracted dump directory.
+
+    Raises:
+        FileNotFoundError: ``archive`` does not exist.
+        FileExistsError: ``destination`` already has a dump with that run id.
+        DumpFormatError: The file is not a zstd tarball, or it does not hold
+            exactly one directory with a ``manifest.json``.
+    """
+    destination.mkdir(parents=True, exist_ok=True)
+    staging = destination / f".unpack-{archive.stem}"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir()
+    try:
+        with (
+            archive.open("rb") as raw,
+            zstandard.ZstdDecompressor().stream_reader(raw) as plain,
+            tarfile.open(fileobj=plain, mode="r|") as tar,
+        ):
+            tar.extractall(staging, filter="data")
+        extracted = [path for path in staging.iterdir() if (path / MANIFEST).is_file()]
+        if len(extracted) != 1:
+            raise DumpFormatError(
+                f"{archive} must contain exactly one run dump, found {len(extracted)}"
+            )
+        final = destination / extracted[0].name
+        if final.exists():
+            raise FileExistsError(f"{final} already exists")
+        extracted[0].rename(final)
+    except (zstandard.ZstdError, tarfile.TarError) as exc:
+        raise DumpFormatError(f"{archive} is not a run dump archive: {exc}") from exc
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    return final

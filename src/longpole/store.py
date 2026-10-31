@@ -325,6 +325,48 @@ class RunStore:
             return None
         return dump.read_run(self.runs_dir / summaries[-1].run_id)
 
+    def pack(self, ref: str, into: Path) -> Path:
+        """Archive one run as ``<into>/<run_id>.tar.zst``.
+
+        Args:
+            ref: Any reference :meth:`resolve` accepts.
+            into: Directory for the archive; created if needed.
+
+        Returns:
+            The archive path.
+
+        Raises:
+            UnknownRunError: The reference names no single run.
+        """
+        directory = self.resolve(ref)
+        return dump.pack(directory, into / f"{directory.name}{dump.ARCHIVE_SUFFIX}")
+
+    def import_archive(self, archive: Path) -> Path:
+        """Add a run from an archive made by :meth:`pack`, possibly on another machine.
+
+        This is how a CI job brings in the baseline run it downloaded. The
+        dump is extracted under ``runs/`` and indexed like a freshly written
+        run.
+
+        Args:
+            archive: The ``.tar.zst`` file.
+
+        Returns:
+            The imported run's directory.
+
+        Raises:
+            FileExistsError: A run with the same id is already stored.
+            DumpFormatError: The archive is not a single valid run dump.
+        """
+        self.runs_dir.mkdir(parents=True, exist_ok=True)
+        directory = dump.unpack(archive, self.runs_dir)
+        run = dump.read_run(directory)
+        with self._summaries_path.open("a", encoding="utf-8") as summaries:
+            summaries.write(json.dumps(asdict(RunSummary.of(run)), sort_keys=True) + "\n")
+        newest = self.summaries()[-1].run_id
+        self._write_latest(newest)
+        return directory
+
     def prune(self, *, keep: int | None = None, older_than: timedelta | None = None) -> list[str]:
         """Delete old runs.
 
