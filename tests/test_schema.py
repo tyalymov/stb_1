@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from longpole.cmake.schema import Json, validate
+from longpole.cmake.schema import validate
 from longpole.errors import SchemaError
+from longpole.jsonfields import Json
 from tests.conftest import BuiltChain
 from tests.support.cmake import InstrumentationQuery
 

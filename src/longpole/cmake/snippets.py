@@ -15,13 +15,12 @@ vendored schemas first, then normalise CMake's field names into
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
-from longpole.cmake.schema import Json, validate
+from longpole.cmake.schema import validate
 from longpole.errors import IndexFormatError, SnippetFormatError
+from longpole.jsonfields import FieldError, Fields, Json, load_object
 from longpole.model import DataVersion, HostLoad, ProcessMetrics, Step, SystemInfo
 
 KNOWN_SNIPPET_FIELDS = frozenset(
@@ -107,10 +106,10 @@ def read_index(path: Path, *, data_dir: Path | None = None, validate_schema: boo
             index schema.
     """
     try:
-        document = _load_object(path)
+        document = load_object(path)
         if validate_schema:
             validate("index", document, source=str(path))
-        fields = _Fields(document)
+        fields = Fields(document)
         recorded_data_dir = Path(fields.string("dataDir"))
         resolved_data_dir = data_dir if data_dir is not None else recorded_data_dir
         static = fields.optional_object("staticSystemInformation")
@@ -125,7 +124,7 @@ def read_index(path: Path, *, data_dir: Path | None = None, validate_schema: boo
             system=system_info_from_static(static) if static is not None else None,
             trace_path=resolved_data_dir / trace if trace is not None else None,
         )
-    except _FieldError as exc:
+    except FieldError as exc:
         raise IndexFormatError(f"index file {path}: {exc}") from exc
 
 
@@ -172,8 +171,8 @@ def read_snippet(path: Path, *, validate_schema: bool = True) -> Step:
             snippet schema.
     """
     try:
-        document = _load_object(path)
-    except _FieldError as exc:
+        document = load_object(path)
+    except FieldError as exc:
         raise SnippetFormatError(f"snippet file {path}: {exc}") from exc
     if validate_schema:
         validate("snippet", document, source=str(path))
@@ -200,13 +199,13 @@ def step_from_snippet(snippet: Json, *, source: Path | None = None) -> Step:
     """
     try:
         return _step(snippet)
-    except _FieldError as exc:
+    except FieldError as exc:
         where = f" file {source}" if source is not None else ""
         raise SnippetFormatError(f"snippet{where}: {exc}") from exc
 
 
 def _step(snippet: Json) -> Step:
-    """Build a Step from a snippet, reporting bad fields as ``_FieldError``.
+    """Build a Step from a snippet, reporting bad fields as ``FieldError``.
 
     Args:
         snippet: The snippet as CMake wrote it.
@@ -215,9 +214,9 @@ def _step(snippet: Json) -> Step:
         The step.
 
     Raises:
-        _FieldError: A required field is missing or a field has the wrong type.
+        FieldError: A required field is missing or a field has the wrong type.
     """
-    fields = _Fields(snippet)
+    fields = Fields(snippet)
     metrics = fields.optional_object("processMetrics")
     load = fields.optional_object("dynamicSystemInformation")
     return Step(
@@ -264,12 +263,12 @@ def system_info_from_static(static: Json) -> SystemInfo:
     """
     try:
         return _system_info(static)
-    except _FieldError as exc:
+    except FieldError as exc:
         raise IndexFormatError(f"staticSystemInformation: {exc}") from exc
 
 
 def _system_info(static: Json) -> SystemInfo:
-    """Convert ``staticSystemInformation``, reporting bad fields as ``_FieldError``.
+    """Convert ``staticSystemInformation``, reporting bad fields as ``FieldError``.
 
     Args:
         static: The object from the index.
@@ -278,9 +277,9 @@ def _system_info(static: Json) -> SystemInfo:
         The host description.
 
     Raises:
-        _FieldError: A field has the wrong type.
+        FieldError: A field has the wrong type.
     """
-    fields = _Fields(static)
+    fields = Fields(static)
     return SystemInfo(
         os_name=fields.optional_string("OSName"),
         os_version=fields.optional_string("OSVersion"),
@@ -293,7 +292,7 @@ def _system_info(static: Json) -> SystemInfo:
     )
 
 
-def _data_version(fields: _Fields) -> DataVersion:
+def _data_version(fields: Fields) -> DataVersion:
     """Read the ``version`` object of an index or snippet.
 
     Args:
@@ -303,7 +302,7 @@ def _data_version(fields: _Fields) -> DataVersion:
         The data version.
 
     Raises:
-        _FieldError: ``version`` is missing or malformed.
+        FieldError: ``version`` is missing or malformed.
     """
     version = fields.object("version")
     return DataVersion(major=version.integer("major"), minor=version.integer("minor"))
@@ -319,9 +318,9 @@ def _process_metrics(metrics: Json) -> ProcessMetrics:
         Typed metrics.
 
     Raises:
-        _FieldError: A field is missing or not an integer.
+        FieldError: A field is missing or not an integer.
     """
-    fields = _Fields(metrics)
+    fields = Fields(metrics)
     return ProcessMetrics(
         max_rss_kib=fields.integer("maxRSS"),
         user_time_us=fields.integer("userTime"),
@@ -339,259 +338,12 @@ def _host_load(load: Json) -> HostLoad:
         Typed host load.
 
     Raises:
-        _FieldError: A field is missing or not a number.
+        FieldError: A field is missing or not a number.
     """
-    fields = _Fields(load)
+    fields = Fields(load)
     return HostLoad(
         memory_used_before_kib=fields.number("beforeHostMemoryUsed"),
         memory_used_after_kib=fields.number("afterHostMemoryUsed"),
         load_average_before=fields.number("beforeCPULoadAverage"),
         load_average_after=fields.number("afterCPULoadAverage"),
     )
-
-
-def _load_object(path: Path) -> Json:
-    """Read a file as a JSON object.
-
-    Args:
-        path: File to read.
-
-    Returns:
-        The parsed object.
-
-    Raises:
-        FileNotFoundError: ``path`` does not exist.
-        _FieldError: The content is not JSON or not a JSON object.
-    """
-    text = path.read_text(encoding="utf-8")
-    try:
-        document: object = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise _FieldError(f"not JSON: {exc}") from exc
-    if not isinstance(document, dict):
-        raise _FieldError("not a JSON object")
-    # JSON object keys are always strings; the cast only tells the type checker so.
-    return cast(Json, document)
-
-
-class _FieldError(Exception):
-    """A field is missing or has the wrong type.
-
-    Raised inside this module only; the public functions catch it and
-    re-raise :class:`IndexFormatError` or :class:`SnippetFormatError` with
-    the file the document came from.
-    """
-
-
-class _Fields:
-    """Typed access to the fields of a parsed JSON object.
-
-    Each accessor checks the runtime type and raises :class:`_FieldError`
-    naming the field, so a malformed file is reported as such rather than as
-    a stray ``TypeError`` later.
-    """
-
-    def __init__(self, document: Json) -> None:
-        """Wrap a document.
-
-        Args:
-            document: Parsed JSON object.
-        """
-        self._document = document
-
-    def string(self, key: str) -> str:
-        """A required string field.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            Its value.
-
-        Raises:
-            _FieldError: When the field is missing or not a string.
-        """
-        value = self._document.get(key)
-        if not isinstance(value, str):
-            raise _FieldError(f"field {key!r} must be a string, got {value!r}")
-        return value
-
-    def optional_string(self, key: str) -> str | None:
-        """A string field that may be absent or ``null``.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The string, or ``None``.
-
-        Raises:
-            _FieldError: When the field is present but not a string.
-        """
-        value = self._document.get(key)
-        if value is None:
-            return None
-        if not isinstance(value, str):
-            raise _FieldError(f"field {key!r} must be a string, got {value!r}")
-        return value
-
-    def integer(self, key: str) -> int:
-        """A required integer field.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            Its value.
-
-        Raises:
-            _FieldError: When the field is missing or not an integer.
-        """
-        value = self._document.get(key)
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise _FieldError(f"field {key!r} must be an integer, got {value!r}")
-        return value
-
-    def optional_int(self, key: str) -> int | None:
-        """An integer field that may be absent or ``null``.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The integer, or ``None``.
-
-        Raises:
-            _FieldError: When the field is present but not an integer.
-        """
-        value = self._document.get(key)
-        if value is None:
-            return None
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise _FieldError(f"field {key!r} must be an integer, got {value!r}")
-        return value
-
-    def optional_bool(self, key: str) -> bool | None:
-        """A boolean field that may be absent.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The boolean, or ``None``.
-
-        Raises:
-            _FieldError: When the field is present but not a boolean.
-        """
-        value = self._document.get(key)
-        if value is None:
-            return None
-        if not isinstance(value, bool):
-            raise _FieldError(f"field {key!r} must be a boolean, got {value!r}")
-        return value
-
-    def number(self, key: str) -> float:
-        """A required numeric field; integers are accepted and widened.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The value as a float.
-
-        Raises:
-            _FieldError: When the field is missing or not a number.
-        """
-        value = self._document.get(key)
-        if isinstance(value, bool) or not isinstance(value, int | float):
-            raise _FieldError(f"field {key!r} must be a number, got {value!r}")
-        return float(value)
-
-    def strings(self, key: str) -> tuple[str, ...]:
-        """An optional array of strings; absent means empty.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The strings, in order.
-
-        Raises:
-            _FieldError: When the field is not an array of strings.
-        """
-        items = self._optional_list(key)
-        if not all(isinstance(item, str) for item in items):
-            raise _FieldError(f"field {key!r} must be an array of strings")
-        return tuple(str(item) for item in items)
-
-    def integers(self, key: str) -> tuple[int, ...]:
-        """An optional array of integers; absent means empty.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The integers, in order.
-
-        Raises:
-            _FieldError: When the field is not an array of integers.
-        """
-        items = self._optional_list(key)
-        if not all(isinstance(item, int) and not isinstance(item, bool) for item in items):
-            raise _FieldError(f"field {key!r} must be an array of integers")
-        return tuple(int(cast(int, item)) for item in items)
-
-    def object(self, key: str) -> _Fields:
-        """A required nested object, wrapped for further typed access.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            Accessor over the nested object.
-
-        Raises:
-            _FieldError: When the field is missing or not an object.
-        """
-        nested = self.optional_object(key)
-        if nested is None:
-            raise _FieldError(f"field {key!r} must be an object, got null")
-        return _Fields(nested)
-
-    def optional_object(self, key: str) -> Json | None:
-        """A nested object that may be absent or ``null``.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The object, or ``None``.
-
-        Raises:
-            _FieldError: When the field is present but not an object.
-        """
-        value = self._document.get(key)
-        if value is None:
-            return None
-        if not isinstance(value, dict):
-            raise _FieldError(f"field {key!r} must be an object, got {value!r}")
-        return cast(Json, value)
-
-    def _optional_list(self, key: str) -> list[object]:
-        """An array field that may be absent; absent means empty.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The raw items.
-
-        Raises:
-            _FieldError: When the field is present but not an array.
-        """
-        value = self._document.get(key)
-        if value is None:
-            return []
-        if not isinstance(value, list):
-            raise _FieldError(f"field {key!r} must be an array, got {value!r}")
-        return cast(list[object], value)

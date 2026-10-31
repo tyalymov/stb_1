@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from longpole.cmake import fileapi
 from tests.support.cmake import (
     CapturedIndex,
     CMakeProject,
@@ -261,6 +262,7 @@ def built_chain(each_cmake: Path, tmp_path_factory: pytest.TempPathFactory) -> B
 
     A full configure and build costs a couple of seconds per version; tests
     that only parse what CMake wrote share one build instead of repeating it.
+    The File API query is in place before configure, so the reply exists too.
     Tests that modify the tree must not use this fixture.
 
     Args:
@@ -280,6 +282,7 @@ def built_chain(each_cmake: Path, tmp_path_factory: pytest.TempPathFactory) -> B
                 options=instrumentation_options(version),
             )
         )
+        fileapi.write_query(project.build_dir)
         project.configure()
         project.build()
         _BUILT_CHAINS[each_cmake] = BuiltChain(

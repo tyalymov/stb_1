@@ -50,3 +50,11 @@ class CMakeToolError(LongpoleError):
     Raised when the binary cannot be started, exits non-zero, times out or
     prints something that is not the expected JSON or text.
     """
+
+
+class FileApiError(LongpoleError):
+    """A CMake File API reply cannot be read.
+
+    Raised when a reply file is not JSON, is not an object, or lacks a field
+    the codemodel or toolchains object kind promises.
+    """

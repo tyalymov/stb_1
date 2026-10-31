@@ -22,11 +22,9 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError, best_match
 
 from longpole.errors import SchemaError
+from longpole.jsonfields import Json
 
 Kind = Literal["query", "index", "snippet"]
-
-Json = dict[str, object]
-"""A parsed JSON object. The shape is CMake's, so values stay ``object``."""
 
 
 @cache

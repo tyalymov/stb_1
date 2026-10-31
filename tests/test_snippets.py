@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from longpole.cmake.schema import Json
 from longpole.cmake.snippets import (
     KNOWN_SNIPPET_FIELDS,
     read_index,
@@ -16,6 +15,7 @@ from longpole.cmake.snippets import (
     step_from_snippet,
 )
 from longpole.errors import IndexFormatError, SchemaError, SnippetFormatError
+from longpole.jsonfields import Json
 from longpole.model import DataVersion
 from tests.conftest import BuiltChain
 
