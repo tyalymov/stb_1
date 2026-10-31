@@ -17,6 +17,7 @@ commands:
     enable           switch CMake instrumentation on for a build tree, or for every build with
                      --global
     capture          store the run an instrumentation index describes; CMake runs this at each hook
+    doctor           check whether a build tree records its builds, and say what to fix if not
 """
 
 from __future__ import annotations
