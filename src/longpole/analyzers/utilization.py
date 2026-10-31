@@ -136,8 +136,8 @@ def _recommend(cpu_count: int | None, peak: int, average: float, tail_share: flo
         return f"Peak {peak} concurrent steps, {average:.1f} on average. {tail}"
     if peak >= cpu_count:
         return (
-            f"The build filled all {cpu_count} cores at its peak ({average:.1f} steps on "
-            f"average); more jobs would not help on this machine. {tail}"
+            f"At its peak {peak} steps ran at once on {cpu_count} cores ({average:.1f} on "
+            f"average), so more jobs would not help on this machine. {tail}"
         )
     return (
         f"At most {peak} of {cpu_count} cores were busy at once ({average:.1f} on average): "
