@@ -80,15 +80,15 @@ def test_paths_with_spaces_are_quoted(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.cmake
 def test_enable_writes_query_graph_request_and_store_marker(
-    tmp_path: Path, each_cmake: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, cmake_binary: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Enabling a tree leaves exactly the files CMake and longpole need, with the right minor."""
     build = tmp_path / "build"
-    assert main(["enable", str(build), "--cmake", str(each_cmake)]) == 0
+    assert main(["enable", str(build), "--cmake", str(cmake_binary)]) == 0
 
     query = build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
     document = json.loads(query.read_text(encoding="utf-8"))
-    expected_minor = tooling.data_version_for_line(cmake_version_of(each_cmake))
+    expected_minor = tooling.data_version_for_line(cmake_version_of(cmake_binary))
     assert expected_minor is not None
     assert document["version"] == {"major": 1, "minor": expected_minor.minor}
     assert document["hooks"] == list(enable.HOOKS)
