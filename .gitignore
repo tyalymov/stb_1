@@ -11,9 +11,6 @@ build/
 .coverage
 htmlcov/
 
-# Tooling installed by scripts/
-.tools/
-
 # Editors
 .idea/
 .vscode/
