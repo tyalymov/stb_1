@@ -48,7 +48,7 @@ cmake --build build
 Each build prints one line on standard error when it finishes:
 
 ```
-longpole: postCMakeBuild recorded as 20261031T051028Z-38635a: 10 steps, 1.5 s, critical path 1.3 s (89%) (longpole analyze)
+longpole: postCMakeBuild recorded as 20261031T140557Z-5d3136: 100 steps, 8.3 s, critical path 8.0 s (96%) (longpole analyze)
 ```
 
 Then look at it:
@@ -58,57 +58,101 @@ cd build
 longpole analyze
 ```
 
-Here is a small project of three targets in a strict chain, each built from
-a generated source:
+Here is {fmt}, the formatting library, built from scratch with Ninja on a
+16-core laptop (CMake 4.4, Release, tests included):
 
 ```
-run 20261031T051028Z-38635a  postCMakeBuild  2026-10-31T05:10:28+00:00
-build dir: /work/chain/build
-span  │ 1.5 s
-busy  │ 1.3 s across the leaf steps
-steps │ 10
+run 20261031T140557Z-5d3136  postCMakeBuild  2026-10-31T14:05:57.811652+00:00
+build dir: /work/fmt/build
+span  │ 8.3 s
+busy  │ 1m 44s across the leaf steps
+steps │ 100
 
 phases
-phase   ┃ steps ┃ total ┃ share
-━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━
-custom  │     3 │ 1.2 s │   87%
-compile │     3 │ 81 ms │    6%
-link    │     3 │ 97 ms │    7%
+phase   ┃ steps ┃  total ┃ share
+━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━
+custom  │     2 │  1.9 s │    2%
+compile │    53 │ 1m 40s │   96%
+link    │    44 │  2.2 s │    2%
+
+slowest targets
+name                  ┃   time ┃ steps ┃ detail
+━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━
+format-impl-test      │ 10.3 s │     7 │ 6 compile, 1 link
+scan-test             │  8.3 s │     6 │ 5 compile, 1 link
+chrono-test           │  8.0 s │     2 │ 1 compile, 1 link
+printf-test           │  7.5 s │     2 │ 1 compile, 1 link
+unicode-test          │  7.3 s │     6 │ 5 compile, 1 link
+format-test           │  6.9 s │     2 │ 1 compile, 1 link
+no-builtin-types-test │  6.8 s │     6 │ 5 compile, 1 link
+core-test             │  5.3 s │     2 │ 1 compile, 1 link
+ranges-test           │  5.0 s │     3 │ 2 compile, 1 link
+gtest                 │  4.9 s │     5 │ 1 compile, 4 link
+
+slowest sources (under /work/fmt)
+name                          ┃  time ┃ steps ┃ detail
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━
+test/gtest-extra.cc           │ 8.8 s │     6 │ C++
+test/chrono-test.cc           │ 7.9 s │     1 │ C++
+test/printf-test.cc           │ 7.4 s │     1 │ C++
+test/util.cc                  │ 7.0 s │     6 │ C++
+test/format-test.cc           │ 6.8 s │     1 │ C++
+src/os.cc                     │ 6.4 s │     5 │ C++
+test/core-test.cc             │ 5.2 s │     1 │ C++
+test/gtest/gmock-gtest-all.cc │ 4.8 s │     1 │ C++
+test/xchar-test.cc            │ 4.2 s │     1 │ C++
+test/ranges-test.cc           │ 4.1 s │     1 │ C++
 
 slowest custom commands
 name    ┃   time ┃ steps ┃ detail
 ━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━
-gen_a.c │ 623 ms │     1 │ passed
-gen_b.c │ 318 ms │     1 │ passed
-gen_c.c │ 213 ms │     1 │ passed
+fmt.pcm │  1.6 s │     1 │ passed
+fmt.o   │ 216 ms │     1 │ passed
 
-critical path: 1.3 s lower bound, 89% of the 1.5 s span
-target ┃  total ┃ custom ┃ compile ┃  link
-━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━
-a      │ 682 ms │ 623 ms │   27 ms │ 32 ms
-b      │ 377 ms │ 318 ms │   27 ms │ 32 ms
-c      │ 273 ms │ 213 ms │   27 ms │ 33 ms
+critical path: 8.0 s lower bound, 96% of the 8.3 s span
+target      ┃ step    ┃  time ┃ what
+━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+chrono-test │ compile │ 7.9 s │ /work/fmt/test/chrono-test.cc
+chrono-test │ link    │ 42 ms │ bin/chrono-test
 
-parallelism: peak 1 of 16 cores, average 1.0
-active 1.3 s, idle 140 ms, single-step tail 1.3 s (100%)
-At most 1 of 16 cores were busy at once (1.0 on average): either the job
-count was below the core count, or there was no more independent work.
-100% of the active time ran a single step.
+parallelism: peak 18 of 16 cores, average 12.5
+active 8.3 s, idle 14 ms, single-step tail 304 ms (4%)
+At its peak 18 steps ran at once on 16 cores (12.5 on average), so more jobs would not help on this
+machine. 4% of the active time ran a single step.
 
-artifacts: 83.2 KiB in 9 files
+artifacts: 59.0 MiB in 84 files
 kind       ┃ files ┃     size
 ━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━
-executable │     1 │ 32.6 KiB
-library    │     2 │ 48.9 KiB
-object     │     3 │  1.6 KiB
-generated  │     3 │    119 B
+executable │    24 │ 19.7 MiB
+library    │     5 │  1.3 MiB
+object     │    53 │ 13.1 MiB
+generated  │     2 │ 24.8 MiB
+
+largest artifacts
+path                                             ┃     size ┃ kind       ┃ target
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━
+fmt.pcm                                          │ 24.5 MiB │ generated  │
+bin/printf-test                                  │  1.6 MiB │ executable │ printf-test
+bin/format-test                                  │  1.6 MiB │ executable │ format-test
+test/CMakeFiles/format-test.dir/format-test.cc.o │  1.6 MiB │ object     │ format-test
+test/CMakeFiles/printf-test.dir/printf-test.cc.o │  1.6 MiB │ object     │ printf-test
+bin/chrono-test                                  │  1.5 MiB │ executable │ chrono-test
+test/CMakeFiles/chrono-test.dir/chrono-test.cc.o │  1.5 MiB │ object     │ chrono-test
+bin/module-test                                  │  1.4 MiB │ executable │ module-test
+bin/core-test                                    │  1.3 MiB │ executable │ core-test
+bin/xchar-test                                   │  1.1 MiB │ executable │ xchar-test
 ```
 
 The critical path is the part worth reading first. It is the longest chain
-of targets that have to wait for each other, priced from the steps each
-target ran. However many cores the machine has, the build cannot finish
-before that chain does. When the chain is most of the span, as here, more
-jobs will not help; when it is a small part, they will.
+of steps that have to wait for each other, priced from what the target
+graph guarantees: a target's compiles wait only for generated sources, its
+link waits for its own compiles and for the links of the targets it depends
+on. However many cores the machine has, the build cannot finish before that
+chain does. Here the chain is one file: `test/chrono-test.cc` compiles for
+7.9 s of the 8.3 s build, so more jobs would not help and splitting that
+file would. When the bound is well below the span, the build was waiting
+either for cores or for ordering the target graph does not record, such as
+a custom command that depends on another target's output.
 
 Other commands:
 
