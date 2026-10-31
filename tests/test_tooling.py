@@ -12,6 +12,7 @@ from longpole.cmake.tooling import (
     config_dir,
     data_version_for_line,
     describe,
+    find_build_tree,
     generated_before,
     last_generate_time,
     query_files,
@@ -154,3 +155,13 @@ def test_generated_before_compares_query_and_generate_times(tmp_path: Path) -> N
     assert generated_before(build, []) is False
     assert generated_before(tmp_path / "unconfigured", [query]) is False
     assert last_generate_time(tmp_path / "unconfigured") is None
+
+
+def test_find_build_tree_walks_up_to_the_cache(tmp_path: Path) -> None:
+    """The nearest ancestor with a CMakeCache.txt is the build tree; none means None."""
+    tree = tmp_path / "build"
+    (tree / "CMakeFiles" / "a.dir").mkdir(parents=True)
+    (tree / "CMakeCache.txt").write_text("", encoding="utf-8")
+    assert find_build_tree(tree / "CMakeFiles" / "a.dir") == tree
+    assert find_build_tree(tree) == tree
+    assert find_build_tree(tmp_path) is None
