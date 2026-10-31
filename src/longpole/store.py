@@ -214,7 +214,9 @@ class RunStore:
         so a damaged index costs time, not data.
 
         Returns:
-            Summaries sorted by run id, which is capture order.
+            Summaries sorted by capture time. Run ids carry whole seconds
+            only, so ``created_at`` decides between runs captured within the
+            same second, as a build and the ctest run right after it are.
         """
         try:
             summaries = self._read_summaries()
@@ -224,7 +226,7 @@ class RunStore:
         if summaries is None:
             summaries = [RunSummary.of(dump.read_run(path)) for path in self._run_dirs()]
             self._rewrite_summaries(summaries)
-        return sorted(summaries, key=lambda summary: summary.run_id)
+        return sorted(summaries, key=lambda summary: (summary.created_at, summary.run_id))
 
     def list(
         self,

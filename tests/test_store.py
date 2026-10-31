@@ -280,3 +280,20 @@ def test_a_real_capture_round_trips_through_the_store(
     assert len(list((store.runs_dir / run.manifest.run_id / "raw" / "snippets").iterdir())) == len(
         run.steps
     )
+
+
+def test_runs_captured_within_one_second_keep_capture_order(tmp_path: Path) -> None:
+    """Ids have whole-second resolution; created_at orders a build and the ctest run after it."""
+    store = RunStore(tmp_path)
+    later = sample_run(run_id="20261031T120000Z-aaaaaa", created_at="2026-10-31T12:00:00.900+00:00")
+    earlier = sample_run(
+        run_id="20261031T120000Z-zzzzzz", created_at="2026-10-31T12:00:00.100+00:00"
+    )
+    store.write(earlier)
+    store.write(later)
+    assert [summary.run_id for summary in store.summaries()] == [
+        "20261031T120000Z-zzzzzz",
+        "20261031T120000Z-aaaaaa",
+    ]
+    assert store.resolve("latest") == store.runs_dir / "20261031T120000Z-aaaaaa"
+    assert store.resolve("latest~1") == store.runs_dir / "20261031T120000Z-zzzzzz"
