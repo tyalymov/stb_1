@@ -15,11 +15,8 @@ from longpole.analyzers.critical_path import (
     critical_path,
 )
 from longpole.analyzers.summary import WRAPPER_ROLES
-from longpole.cmake import fileapi
 from longpole.model import Graph, Run, Step, TargetNode
-from tests.conftest import cmake_version_of, make_project
-from tests.support.cmake import InstrumentationQuery, instrumentation_options
-from tests.support.runs import run_from_capture, sample_run
+from tests.support.runs import sample_run
 
 
 def _path(run: Run) -> CriticalPath:
@@ -187,27 +184,10 @@ def test_real_chain_matches_the_known_answer(chain_run: Run) -> None:
 
 @pytest.mark.cmake
 @pytest.mark.slow
-def test_fanout_built_in_parallel_has_a_path_far_below_its_busy_time(
-    tmp_path: Path, cmake_binary: Path
-) -> None:
+def test_fanout_built_in_parallel_has_a_path_far_below_its_busy_time(fanout_run: Run) -> None:
     """Eight independent generators overlap, so the one target's path is about one sleep long."""
-    version = cmake_version_of(cmake_binary)
-    project = make_project("fanout", tmp_path, cmake_binary)
-    project.write_query(
-        InstrumentationQuery(
-            hooks=("postCMakeBuild",),
-            callbacks=(project.callback,),
-            options=instrumentation_options(version),
-        )
-    )
-    fileapi.write_query(project.build_dir)
-    project.configure()
-    project.build("--parallel", "8")
-    capture = next(c for c in project.captured() if c.hook == "postCMakeBuild")
-    run = run_from_capture(capture, project.build_dir)
-
-    result = _path(run)
+    result = _path(fanout_run)
     assert [target.name for target in result.chain] == ["fanout"]
-    busy_ms = sum(step.duration_ms for step in run.steps if step.role not in WRAPPER_ROLES)
+    busy_ms = sum(step.duration_ms for step in fanout_run.steps if step.role not in WRAPPER_ROLES)
     assert result.lower_bound_ms < busy_ms / 2
     assert 300 <= result.lower_bound_ms <= result.span_ms

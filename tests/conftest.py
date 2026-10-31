@@ -20,6 +20,7 @@ from tests.support.cmake import (
     InstrumentationQuery,
     instrumentation_options,
 )
+from tests.support.runs import run_from_capture
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MINIMUM_VERSION = (4, 3)
@@ -324,3 +325,39 @@ def chain_run(built_chain: BuiltChain) -> Run:
         graph=fileapi.graph_from_reply(reply),
         system=index.system,
     )
+
+
+_FANOUT_RUNS: dict[Path, Run] = {}
+
+
+@pytest.fixture
+def fanout_run(cmake_binary: Path, tmp_path_factory: pytest.TempPathFactory) -> Run:
+    """The fan-out fixture built once with eight jobs, with its graph, for parallelism tests.
+
+    Eight independent generators overlap when the build tool may run eight
+    jobs, which is what the utilization and critical path analyzers need to
+    see. Built once per session with the default CMake; the tree is not
+    exposed, so nothing can modify it.
+
+    Args:
+        cmake_binary: The session's CMake.
+        tmp_path_factory: pytest's session-wide temporary directory factory.
+
+    Returns:
+        The ``postCMakeBuild`` run of that build.
+    """
+    if cmake_binary not in _FANOUT_RUNS:
+        project = make_project("fanout", tmp_path_factory.mktemp("built-fanout"), cmake_binary)
+        project.write_query(
+            InstrumentationQuery(
+                hooks=("postCMakeBuild",),
+                callbacks=(project.callback,),
+                options=instrumentation_options(cmake_version_of(cmake_binary)),
+            )
+        )
+        fileapi.write_query(project.build_dir)
+        project.configure()
+        project.build("--parallel", "8")
+        capture = next(c for c in project.captured() if c.hook == "postCMakeBuild")
+        _FANOUT_RUNS[cmake_binary] = run_from_capture(capture, project.build_dir)
+    return _FANOUT_RUNS[cmake_binary]
