@@ -57,7 +57,6 @@ dev = [
 line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
-extend-exclude = [".tools"]
 
 [tool.ruff.lint]
 select = [
@@ -95,7 +94,7 @@ docstring-code-format = true
 
 [tool.pyright]
 include = ["src", "tests"]
-exclude = [".venv", ".tools", "**/__pycache__"]
+exclude = [".venv", "**/__pycache__"]
 typeCheckingMode = "strict"
 pythonVersion = "3.11"
 venvPath = "."
@@ -103,7 +102,7 @@ venv = ".venv"
 
 [tool.pydoclint]
 style = "google"
-exclude = '\.venv|\.tools|tests'
+exclude = '\.venv|tests'
 arg-type-hints-in-docstring = false
 check-return-types = false
 check-yield-types = false
