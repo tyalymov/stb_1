@@ -12,15 +12,55 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
-from longpole.model import GitInfo
+from longpole.cmake import fileapi, tooling
+from longpole.errors import CMakeToolError
+from longpole.model import Environment, GitInfo
 
 log = logging.getLogger(__name__)
 
 _GIT_TIMEOUT = 10.0
 """Seconds to wait for each git command; a hung git must not stall a callback."""
+
+_CCACHE_TIMEOUT = 10.0
+"""Seconds to wait for ccache; same reasoning."""
+
+
+def collect(build_dir: Path, *, reply: fileapi.Reply | None) -> Environment:
+    """Gather the environment of a build tree at capture time.
+
+    Reads the cache for the generator and the configuring ``cmake``, asks
+    that binary for its full version string (the cache only knows
+    ``major.minor.patch``), and looks at the source checkout, the CPUs and
+    ccache. Every part tolerates absence: an unconfigured tree yields an
+    :class:`~longpole.model.Environment` of ``None`` values.
+
+    Args:
+        build_dir: The build tree.
+        reply: File API reply for the tree, for the toolchains; ``None`` when
+            CMake has not answered yet.
+
+    Returns:
+        What could be learned.
+    """
+    cache = tooling.read_cache(build_dir)
+    cmake_version = cache.cmake_version
+    if cache.cmake_command is not None:
+        try:
+            cmake_version = tooling.describe(cache.cmake_command).version
+        except CMakeToolError as exc:
+            log.debug("cannot describe %s, keeping the cache version: %s", cache.cmake_command, exc)
+    return Environment(
+        cmake_version=cmake_version,
+        generator=cache.generator,
+        cpu_count=cpu_count(),
+        git=git_info(cache.source_dir or build_dir),
+        toolchains=fileapi.toolchains_from_reply(reply) if reply is not None else (),
+        ccache=ccache_stats(),
+    )
 
 
 def git_info(path: Path) -> GitInfo | None:
@@ -80,3 +120,49 @@ def _git(path: Path, *arguments: str) -> str | None:
     if completed.returncode != 0:
         return None
     return completed.stdout.strip()
+
+
+def ccache_stats() -> dict[str, str] | None:
+    """Read ccache's counters, when ccache is installed.
+
+    Uses ``ccache --print-stats``, the machine-readable form available since
+    ccache 4: one ``name<TAB>value`` pair per line.
+
+    Returns:
+        Counter names and values as strings, or ``None`` when ccache is not
+        on ``PATH`` or does not answer.
+    """
+    executable = shutil.which("ccache")
+    if executable is None:
+        return None
+    try:
+        completed = subprocess.run(
+            [executable, "--print-stats"],
+            capture_output=True,
+            text=True,
+            timeout=_CCACHE_TIMEOUT,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        log.debug("ccache --print-stats unavailable: %s", exc)
+        return None
+    if completed.returncode != 0:
+        return None
+    return parse_ccache_stats(completed.stdout)
+
+
+def parse_ccache_stats(text: str) -> dict[str, str]:
+    """Parse ``ccache --print-stats`` output.
+
+    Args:
+        text: The command's standard output.
+
+    Returns:
+        Mapping from counter name to its value; lines without a tab are skipped.
+    """
+    stats: dict[str, str] = {}
+    for line in text.splitlines():
+        name, tab, value = line.partition("\t")
+        if tab:
+            stats[name.strip()] = value.strip()
+    return stats
