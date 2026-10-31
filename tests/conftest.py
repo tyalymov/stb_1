@@ -30,14 +30,15 @@ def _cmake_from_environment() -> Path | None:
     """Resolve the CMake binary the suite should use.
 
     ``LONGPOLE_CMAKE`` may point at the ``cmake`` executable or at the
-    directory that contains it; without it we take whatever is on ``PATH``.
+    directory that contains it, as an absolute or a relative path; without
+    it we take whatever is on ``PATH``.
 
     Returns:
-        Path to an executable ``cmake``, or ``None`` if there is none.
+        Absolute path to an executable ``cmake``, or ``None`` if there is none.
     """
     configured = os.environ.get("LONGPOLE_CMAKE")
     if configured:
-        candidate = Path(configured)
+        candidate = Path(configured).expanduser().resolve()
         if candidate.is_dir():
             candidate = candidate / "cmake"
         return candidate if candidate.is_file() else None
