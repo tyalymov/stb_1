@@ -1,7 +1,11 @@
-"""Ready-made runs for tests that need realistic data without driving CMake."""
+"""Ready-made runs for tests, and a way to assemble one from what a real build captured."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from longpole.cmake import fileapi, snippets
+from longpole.env import collect
 from longpole.model import (
     DataVersion,
     Environment,
@@ -16,6 +20,39 @@ from longpole.model import (
     TargetNode,
     Toolchain,
 )
+from longpole.store import new_run_id
+from tests.support.cmake import CapturedIndex
+
+
+def run_from_capture(capture: CapturedIndex, build_dir: Path) -> Run:
+    """Assemble a run from an index the callback stub saved, the way ``capture`` would.
+
+    Args:
+        capture: The saved index and snippets.
+        build_dir: The build tree the index came from; its File API reply, if
+            any, becomes the run's graph.
+
+    Returns:
+        The run, with a graph when the reply exists and without one otherwise.
+    """
+    index = snippets.read_index(
+        capture.directory / "index.json", data_dir=capture.directory / "snippets"
+    )
+    reply = fileapi.read_reply(build_dir)
+    return Run(
+        manifest=Manifest(
+            run_id=new_run_id(),
+            created_at="2026-10-31T12:00:00+00:00",
+            tool_version="test",
+            hook=index.hook,
+            build_dir=str(index.build_dir),
+            data_version=index.version,
+            environment=collect(build_dir, reply=reply),
+        ),
+        steps=snippets.read_steps(index),
+        graph=fileapi.graph_from_reply(reply) if reply is not None else None,
+        system=index.system,
+    )
 
 
 def sample_run(
