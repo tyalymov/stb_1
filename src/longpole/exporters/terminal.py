@@ -203,15 +203,16 @@ def format_report(report: Report) -> str:
 
 
 def critical_path_table(path: CriticalPath | Unavailable) -> RenderableType:
-    """The critical path as a table of targets, or the reason there is none.
+    """The critical path as a table of segments, or the reason there is none.
 
     Args:
         path: The analyzer's result.
 
     Returns:
         The table, captioned with the lower bound and its share of the span,
-        followed by the unattributed custom commands when there are any; or
-        one line with the reason.
+        one row per segment of the chain in build order, followed by the
+        unattributed custom commands when there are any; or one line with
+        the reason.
     """
     if isinstance(path, Unavailable):
         return Text(f"critical path: {path.reason}")
@@ -221,18 +222,12 @@ def critical_path_table(path: CriticalPath | Unavailable) -> RenderableType:
     )
     chain = table(
         caption,
-        ("target", "total", "custom", "compile", "link"),
+        ("target", "step", "time", "what"),
         [
-            (
-                target.name,
-                units.duration(target.total_ms),
-                units.duration(target.custom_ms),
-                units.duration(target.compile_ms),
-                units.duration(target.link_ms),
-            )
-            for target in path.chain
+            (segment.target, segment.kind, units.duration(segment.duration_ms), segment.detail)
+            for segment in path.chain
         ],
-        right_aligned=(1, 2, 3, 4),
+        right_aligned=(2,),
     )
     if not path.unattributed:
         return chain

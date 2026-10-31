@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
+from typing import cast
 
 import pytest
 
@@ -29,8 +31,10 @@ def test_json_layout_carries_the_derived_numbers() -> None:
     path = data["critical_path"]
     assert isinstance(path, dict)
     assert path["available"] is True
-    assert path["lower_bound_ms"] == 180
-    assert path["share"] == pytest.approx(180 / 2406)
+    assert path["lower_bound_ms"] == 132
+    assert path["share"] == pytest.approx(132 / 2406)
+    chain = cast("Sequence[Mapping[str, object]]", path["chain"])
+    assert [segment["kind"] for segment in chain] == ["compile", "link", "link", "link"]
     parallelism = data["utilization"]
     assert isinstance(parallelism, dict)
     assert parallelism["tail_share"] == 1.0
@@ -53,7 +57,8 @@ def test_text_report_has_every_section() -> None:
     """The text shows the summary first, then the path, the parallelism and the sizes."""
     text = terminal.format_report(build_report(sample_run()))
     assert text.index("slowest targets") < text.index("critical path: ")
-    assert "critical path: 180 ms lower bound, 7% of the 2.4 s span" in text
+    assert "critical path: 132 ms lower bound, 5% of the 2.4 s span" in text
+    assert "target" in text and " what" in text
     assert "parallelism: peak 1 of 12 cores, average 1.0" in text
     assert "At most 1 of 12 cores" in text
     assert "artifacts: 99.3 KiB in 6 files" in text
@@ -70,9 +75,10 @@ def test_text_report_without_a_graph_prints_the_reason() -> None:
 @pytest.mark.cmake
 @pytest.mark.slow
 def test_real_chain_report_names_the_chain(chain_run: Run) -> None:
-    """On the chain build the path section lists a, b and c with a lower bound in seconds."""
+    """On the chain build the path section lists segments of a, b and c with a lower bound."""
     text = terminal.format_report(build_report(chain_run))
     section = text[text.index("critical path: ") :]
     assert "lower bound" in section
     for name in ("a", "b", "c"):
         assert f"\n{name} " in section
+    assert "gen_a.c" in section, "the longest generator opens the chain"
