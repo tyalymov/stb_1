@@ -153,16 +153,10 @@ def _critical_path_section(path: CriticalPath | Unavailable, rows: int | None) -
     lines.append("")
     lines.extend(
         _table(
-            ("target", "total", "custom", "compile", "link"),
+            ("target", "step", "time", "what"),
             [
-                (
-                    f"`{t.name}`",
-                    units.duration(t.total_ms),
-                    units.duration(t.custom_ms),
-                    units.duration(t.compile_ms),
-                    units.duration(t.link_ms),
-                )
-                for t in path.chain
+                (f"`{s.target}`", s.kind, units.duration(s.duration_ms), f"`{s.detail}`")
+                for s in path.chain
             ],
         )
     )
@@ -181,10 +175,11 @@ def _critical_path_section(path: CriticalPath | Unavailable, rows: int | None) -
 
 
 def _gantt(path: CriticalPath) -> list[str]:
-    """Draw the chain as a Mermaid Gantt chart, one bar per target, end to end.
+    """Draw the chain as a Mermaid Gantt chart, one bar per segment, end to end.
 
     Mermaid reads ``dateFormat x`` as milliseconds since the epoch; the bars
-    start at zero and the axis shows minutes and seconds.
+    sit at the segments' model times, which start at zero, and the axis
+    shows minutes and seconds.
 
     Args:
         path: The critical path.
@@ -193,12 +188,10 @@ def _gantt(path: CriticalPath) -> list[str]:
         The fenced code block.
     """
     lines = ["```mermaid", "gantt", "    dateFormat x", "    axisFormat %M:%S", "    section chain"]
-    cursor = 0
-    for index, target in enumerate(path.chain):
-        end = cursor + target.total_ms
-        label = f"{target.name} ({units.duration(target.total_ms)})".replace(":", " ")
-        lines.append(f"    {label} :t{index}, {cursor}, {end}")
-        cursor = end
+    for index, segment in enumerate(path.chain):
+        label = f"{segment.target} {segment.kind} ({units.duration(segment.duration_ms)})"
+        label = label.replace(":", " ")
+        lines.append(f"    {label} :t{index}, {segment.start_ms}, {segment.end_ms}")
     lines.append("```")
     return lines
 

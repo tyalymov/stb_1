@@ -20,16 +20,17 @@ def test_snapshot_has_headline_sections_and_the_gantt_chart() -> None:
     text = markdown.format_markdown(build_report(sample_run()))
     assert text.startswith("## longpole: postCMakeBuild `20261031T120000Z-abc123`\n")
     assert (
-        "**2.4 s** wall clock · 452 ms busy · 8 steps · critical path 180 ms (7% of the span)"
+        "**2.4 s** wall clock · 452 ms busy · 8 steps · critical path 132 ms (5% of the span)"
         in text
     )
     for heading in ("### Critical path", "### Parallelism", "### Artifacts"):
         assert heading in text
     assert "```mermaid\ngantt\n    dateFormat x\n" in text
     assert (
-        "    a (60 ms) :t0, 0, 60\n    b (60 ms) :t1, 60, 120\n    c (60 ms) :t2, 120, 180\n"
-        in text
+        "    a compile (24 ms) :t0, 0, 24\n    a link (36 ms) :t1, 24, 60\n"
+        "    b link (36 ms) :t2, 60, 96\n    c link (36 ms) :t3, 96, 132\n" in text
     )
+    assert "| target | step | time | what |" in text
     assert "<details><summary>Slowest targets</summary>" in text
     assert "| phase | steps | total | share |" in text
     assert text.endswith("\n") and not text.endswith("\n\n")
@@ -107,10 +108,10 @@ def test_export_writes_markdown(tmp_path: Path, capsys: pytest.CaptureFixture[st
 @pytest.mark.cmake
 @pytest.mark.slow
 def test_real_chain_snapshot_draws_the_chain(chain_run: Run) -> None:
-    """A real build gets a Gantt chart with a, b and c and a sizes table with the libraries."""
+    """A real build gets a Gantt chart with the generator, a's steps and the links of b and c."""
     text = markdown.format_markdown(build_report(chain_run))
     assert "gantt" in text
-    for name in ("a (", "b (", "c ("):
-        assert name in text
+    for label in ("a custom (", "a compile (", "a link (", "b link (", "c link ("):
+        assert label in text
     assert "| library |" in text
     assert "lower bound" in text
