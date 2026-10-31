@@ -1,0 +1,36 @@
+[project]
+name = "longpole"
+dynamic = ["version"]
+description = "Find the long pole in your CMake build: collects CMake instrumentation data and shows what actually gates the build."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.11"
+authors = [{ name = "Timur Ialymov", email = "yalymov.tm@gmail.com" }]
+keywords = ["cmake", "build", "instrumentation", "telemetry", "critical-path"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Build Tools",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/tyalymov/longpole"
+Issues = "https://github.com/tyalymov/longpole/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/longpole/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/longpole"]
