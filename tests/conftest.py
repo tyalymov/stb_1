@@ -142,3 +142,35 @@ def chain(tmp_path: Path, cmake_binary: Path, generator: str) -> CMakeProject:
         An unconfigured project; call ``write_query`` and ``configure`` first.
     """
     return make_project("chain", tmp_path, cmake_binary, generator)
+
+
+@pytest.fixture
+def fanout(tmp_path: Path, cmake_binary: Path, generator: str) -> CMakeProject:
+    """The ``fanout`` fixture project: eight independent generated sources, one executable.
+
+    Args:
+        tmp_path: pytest's per-test temporary directory.
+        cmake_binary: The session's CMake.
+        generator: Generator under test.
+
+    Returns:
+        An unconfigured project.
+    """
+    return make_project("fanout", tmp_path, cmake_binary, generator)
+
+
+@pytest.fixture
+def with_tests(tmp_path: Path, cmake_binary: Path) -> CMakeProject:
+    """The ``with_tests`` fixture project: four ctest tests, one failing, nothing to compile.
+
+    Uses Ninja only; the generator does not matter for a project with no
+    languages, and ctest writes test snippets itself.
+
+    Args:
+        tmp_path: pytest's per-test temporary directory.
+        cmake_binary: The session's CMake.
+
+    Returns:
+        An unconfigured project.
+    """
+    return make_project("with_tests", tmp_path, cmake_binary)
