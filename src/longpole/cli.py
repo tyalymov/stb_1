@@ -20,6 +20,7 @@ commands:
     doctor           check whether a build tree records its builds, and say what to fix if not
     analyze          report on a run: totals, phases, slowest items, critical path, parallelism,
                      sizes
+    export           write a run as a Perfetto trace
 """
 
 from __future__ import annotations
