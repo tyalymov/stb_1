@@ -77,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         with context.activate(cli, env):
             return COMMANDS[cli.command].run()
     except UsageError as exc:
-        print(exc, file=sys.stderr)
+        sys.stderr.write(f"{exc}\n")
         return 2
     except LongpoleError as exc:
         log.error("%s", exc)
