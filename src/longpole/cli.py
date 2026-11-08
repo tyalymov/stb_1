@@ -26,7 +26,7 @@ from __future__ import annotations
 import io
 import logging
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated
 
@@ -35,7 +35,7 @@ from rich.console import Console
 
 from longpole import __version__, context, output
 from longpole.cli_config import CliConfig, LogLevel
-from longpole.commands import COMMANDS
+from longpole.commands import analyze, capture, doctor, enable, export, runs
 from longpole.env_config import load_env
 from longpole.errors import LongpoleError, UsageError
 
@@ -54,10 +54,10 @@ HANDLER_NAME = "longpole-stderr"
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code.
 
-    Builds the application from the command registry, parses ``argv`` and
-    runs the chosen command. The process never ends with a traceback:
-    expected failures are logged and mapped to their exit codes, unexpected
-    ones are logged with the stack and return :data:`EXIT_UNEXPECTED`.
+    Builds the application, parses ``argv`` and runs the chosen command. The
+    process never ends with a traceback: expected failures are logged and
+    mapped to their exit codes, unexpected ones are logged with the stack and
+    return :data:`EXIT_UNEXPECTED`.
 
     Args:
         argv: Arguments without the program name. ``None`` means
@@ -71,7 +71,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        result = build_app(COMMANDS).meta(args, exit_on_error=False, print_error=False)
+        result = build_app().meta(args, exit_on_error=False, print_error=False)
         return 0 if result is None else int(result)
     except CycloptsError as exc:
         output.stderr(f"error: {exc}")
@@ -89,18 +89,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_UNEXPECTED
 
 
-def build_app(commands: Sequence[Callable[..., int] | App]) -> App:
-    """Assemble the application: the global options in front of the given commands.
+def build_app() -> App:
+    """Assemble the application: the global options in front of the commands.
 
     The commands form the inner app. The global options belong to its meta
     app, whose only job is to parse them, publish the configuration through
     :mod:`longpole.context` and hand the remaining tokens to the inner app.
     That is how ``longpole --json analyze`` gets its flag before the command
     word, the way git does it.
-
-    Args:
-        commands: Command functions or sub-apps, in the order ``--help``
-            should list them.
 
     Returns:
         The application; call its ``meta`` with the arguments.
@@ -120,7 +116,15 @@ def build_app(commands: Sequence[Callable[..., int] | App]) -> App:
         result_action="return_value",
         default_parameter=Parameter(negative="", show_default=False, show_choices=False),
     )
-    for position, command in enumerate(commands):
+    commands = (
+        enable.enable,
+        capture.capture,
+        doctor.doctor,
+        analyze.analyze,
+        export.export,
+        runs.app,
+    )
+    for position, command in enumerate(commands):  # position: the order --help lists them
         if isinstance(command, App):
             command.sort_key = position
             app.command(command)
@@ -159,20 +163,17 @@ def build_app(commands: Sequence[Callable[..., int] | App]) -> App:
     return app
 
 
-def help_text(commands: Sequence[Callable[..., int] | App] = COMMANDS) -> str:
+def help_text() -> str:
     """Render ``longpole --help`` as a string.
 
     The module docstring of this file is kept equal to it by
     ``scripts/sync-cli-help.py`` and a test.
 
-    Args:
-        commands: Commands to list; the registry by default.
-
     Returns:
         The help text, wrapped at the app's width, without the trailing
         spaces rich pads lines with.
     """
-    app = build_app(commands)
+    app = build_app()
     buffer = io.StringIO()
     app.meta(["--help"], console=Console(file=buffer, width=app.console.width))
     padded = buffer.getvalue().splitlines()

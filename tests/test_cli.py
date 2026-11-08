@@ -7,10 +7,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from cyclopts import App
 
 from longpole import __version__, cli, context, output
 from longpole.cli import help_text, main
-from longpole.commands import COMMANDS
 from longpole.errors import LongpoleError
 
 
@@ -28,16 +28,20 @@ def echo(word: str, /) -> int:
 
 
 def _with_command(monkeypatch: pytest.MonkeyPatch, command: Callable[..., int]) -> None:
-    """Add a command to the registry for one test.
+    """Make ``main`` build its app with one extra command, for one test.
 
     Args:
         monkeypatch: pytest's monkeypatch fixture.
         command: The command function; its name is the command word.
     """
-    from longpole import commands
+    build_app = cli.build_app
 
-    monkeypatch.setattr(commands, "COMMANDS", (*COMMANDS, command))
-    monkeypatch.setattr(cli, "COMMANDS", (*COMMANDS, command))
+    def build_with_extra() -> App:
+        app = build_app()
+        app.command(command)
+        return app
+
+    monkeypatch.setattr(cli, "build_app", build_with_extra)
 
 
 def _lines(text: str) -> list[str]:

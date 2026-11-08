@@ -133,8 +133,8 @@ The rules behind that shape:
   its own (`runs show`, `runs prune`) is a cyclopts `App` whose default
   function handles the bare command. The function reads the global options
   from `context.cli()` and `context.env()`, does the work and returns the
-  exit code. `commands/__init__.py` lists the commands in `--help` order;
-  `cli.py` builds the app from that list.
+  exit code. `build_app` in `cli.py` registers the commands, in `--help`
+  order.
 - Errors are a small hierarchy under `LongpoleError`, each with an
   `exit_code`. Low-level exceptions are wrapped at the layer boundary with
   a message a user can act on.
