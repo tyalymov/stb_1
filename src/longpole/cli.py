@@ -41,9 +41,6 @@ from longpole.errors import UsageError
 
 log = logging.getLogger(__name__)
 
-LOGGER_NAME = "longpole"
-HANDLER_NAME = "longpole-stderr"
-
 
 app = App(
     name="longpole",
@@ -148,20 +145,20 @@ def help_text() -> str:
 def configure_logging(level: str) -> None:
     """Send the ``longpole`` logger hierarchy to standard error at the given level.
 
-    Called once per :func:`main`. The handler is rebuilt each time so it
-    writes to whatever ``sys.stderr`` is right now: pytest swaps the stream
-    per test, and a handler created for an earlier test would otherwise keep
-    writing into a closed capture. Other loggers are left alone.
+    Called more than once per process: by :func:`main` before parsing and by
+    :func:`launcher` once ``--log-level`` is known, and by every ``main([...])``
+    a test makes. The handler is rebuilt each time so it writes to whatever
+    ``sys.stderr`` is right now: pytest swaps the stream per test, and a
+    handler created for an earlier test would otherwise keep writing into a
+    closed capture. Only the ``longpole`` logger is touched; the libraries'
+    loggers keep whatever they have.
 
     Args:
         level: One of :data:`longpole.cli_config.LogLevel`, any case.
     """
-    logger = logging.getLogger(LOGGER_NAME)
+    logger = logging.getLogger("longpole")
     logger.setLevel(level.upper())
-    for handler in list(logger.handlers):
-        if handler.get_name() == HANDLER_NAME:
-            logger.removeHandler(handler)
+    logger.handlers.clear()
     handler = logging.StreamHandler(sys.stderr)
-    handler.set_name(HANDLER_NAME)
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(handler)
