@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
-from cyclopts import App
 
 from longpole import __version__, cli, context, output
 from longpole.cli import help_text, main
@@ -27,21 +26,25 @@ def echo(word: str, /) -> int:
     return 0
 
 
-def _with_command(monkeypatch: pytest.MonkeyPatch, command: Callable[..., int]) -> None:
-    """Make ``main`` build its app with one extra command, for one test.
+Register = Callable[[Callable[..., int]], None]
 
-    Args:
-        monkeypatch: pytest's monkeypatch fixture.
-        command: The command function; its name is the command word.
+
+@pytest.fixture
+def register() -> Iterator[Register]:
+    """Let a test add commands to the app; they are removed again on teardown.
+
+    Yields:
+        A function that registers one command; its name is the command word.
     """
-    build_app = cli.build_app
+    added: list[str] = []
 
-    def build_with_extra() -> App:
-        app = build_app()
-        app.command(command)
-        return app
+    def add(command: Callable[..., int]) -> None:
+        cli.app.command(command)
+        added.append(command.__name__)
 
-    monkeypatch.setattr(cli, "build_app", build_with_extra)
+    yield add
+    for name in added:
+        del cli.app[name]
 
 
 def _lines(text: str) -> list[str]:
@@ -101,10 +104,10 @@ def test_unknown_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) ->
 
 
 def test_unknown_option_is_a_usage_error(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """An option the command does not know is reported, not swallowed."""
-    _with_command(monkeypatch, echo)
+    register(echo)
     assert main(["echo", "hi", "--frobnicate"]) == 1
     assert "--frobnicate" in capsys.readouterr().err
 
@@ -118,7 +121,7 @@ def test_bad_log_level_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> N
 
 
 def test_global_options_are_published(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Global flags before the command word land in CliConfig; a command reads them from context."""
 
@@ -127,7 +130,7 @@ def test_global_options_are_published(
         output.stdout(f"{config.log_level} {config.store} {config.json_output}")
         return 0
 
-    _with_command(monkeypatch, peek)
+    register(peek)
     assert main(["--log-level", "debug", "--store", "/tmp/store", "--json", "peek"]) == 0
     assert capsys.readouterr().out == "debug /tmp/store True\n"
     assert main(["peek"]) == 0
@@ -135,26 +138,26 @@ def test_global_options_are_published(
 
 
 def test_command_runs_with_its_arguments(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A registered command gets its arguments typed from the command line."""
-    _with_command(monkeypatch, echo)
+    register(echo)
     assert main(["echo", "hello"]) == 0
     assert capsys.readouterr().out == "hello\n"
 
 
 def test_missing_argument_is_a_usage_error(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A required positional left out is a usage error naming it."""
-    _with_command(monkeypatch, echo)
+    register(echo)
     assert main(["echo"]) == 1
     assert "WORD" in capsys.readouterr().err
 
 
-def test_context_is_cleared_after_main(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_context_is_cleared_after_main(register: Register) -> None:
     """Once main returns, nothing is active any more, so the next call starts clean."""
-    _with_command(monkeypatch, echo)
+    register(echo)
     assert main(["echo", "hello"]) == 0
     with pytest.raises(RuntimeError, match="no active configuration"):
         context.cli()
@@ -163,14 +166,14 @@ def test_context_is_cleared_after_main(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_failure_is_logged_once_and_exits_1(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """An expected error is one line on stderr, nothing on stdout, exit code 1."""
 
     def fail() -> int:
         raise LongpoleError("the disk is on fire")
 
-    _with_command(monkeypatch, fail)
+    register(fail)
     assert main(["fail"]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -178,14 +181,14 @@ def test_failure_is_logged_once_and_exits_1(
 
 
 def test_unexpected_exception_shows_the_stack_only_at_debug(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A bug is the same one line by default; --log-level debug adds the traceback."""
 
     def explode() -> int:
         raise ZeroDivisionError("boom")
 
-    _with_command(monkeypatch, explode)
+    register(explode)
     assert main(["explode"]) == 1
     assert capsys.readouterr().err == "ERROR: boom\n"
     assert main(["--log-level", "debug", "explode"]) == 1
@@ -195,7 +198,7 @@ def test_unexpected_exception_shows_the_stack_only_at_debug(
 
 
 def test_log_level_controls_what_reaches_stderr(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Debug records show up only when asked for; the handler follows the current stderr."""
     log = logging.getLogger("longpole.test")
@@ -205,7 +208,7 @@ def test_log_level_controls_what_reaches_stderr(
         log.warning("shout")
         return 0
 
-    _with_command(monkeypatch, chatty)
+    register(chatty)
     assert main(["chatty"]) == 0
     assert capsys.readouterr().err == "WARNING: shout\n"
     assert main(["--log-level", "debug", "chatty"]) == 0

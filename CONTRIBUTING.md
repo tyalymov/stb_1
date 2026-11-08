@@ -78,7 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     configure_logging("warning")  # the launcher reconfigures once --log-level is known
     try:
-        return build_app().meta(args, exit_on_error=False, print_error=False)
+        return app.meta(args, exit_on_error=False, print_error=False)
     except Exception as exc:
         log.error("%s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
         return 1
@@ -98,9 +98,9 @@ The rules behind that shape:
 - The command line is parsed by [cyclopts](https://cyclopts.readthedocs.io/)
   with a git-like layout: global flags first (`--log-level`, `--store`,
   `--json`), then a command and its flags. The global flags belong to the
-  app's *meta* app in `build_app`: it parses them, publishes the
-  configuration and hands the remaining tokens to the inner app that holds
-  the commands. Nothing exits the process: `exit_on_error=False` turns parse
+  app's *meta* app, the `launcher` function in `cli.py`: it parses them,
+  publishes the configuration and hands the remaining tokens to the app
+  that holds the commands. Nothing exits the process: `exit_on_error=False` turns parse
   errors into exceptions, and `result_action="return_int_as_exit_code_else_zero"`
   makes `--help` and `--version` return 0 after printing. Otherwise `main`
   could not be called from a test.
@@ -122,7 +122,7 @@ The rules behind that shape:
   its own (`runs show`, `runs prune`) is a cyclopts `App` whose default
   function handles the bare command. The function reads the global options
   from `context.cli()` and `context.env()`, does the work and returns the
-  exit code. `build_app` in `cli.py` registers the commands.
+  exit code. `cli.py` registers the commands on the module-level `app`.
 - Errors are a small hierarchy under `LongpoleError`. Low-level exceptions
   are wrapped at the layer boundary with a message a user can act on. `main`
   does not tell them apart: every exception is one `ERROR:` line on stderr

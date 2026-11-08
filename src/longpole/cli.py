@@ -45,13 +45,71 @@ LOGGER_NAME = "longpole"
 HANDLER_NAME = "longpole-stderr"
 
 
+app = App(
+    name="longpole",
+    help=(
+        "Find the long pole in your CMake build. longpole records the instrumentation data "
+        "CMake 4.3 and later can write for every configure, compile, link, custom command and "
+        "test step, stores each build as a run, and shows what actually gated it."
+    ),
+    version=f"longpole {__version__}",
+    # Fixed width, so the help text does not depend on the terminal it is printed to.
+    console=Console(width=100),
+    help_format="plaintext",
+    result_action="return_int_as_exit_code_else_zero",
+    default_parameter=Parameter(negative="", show_default=False, show_choices=False),
+)
+"""The commands. Nothing here exits the process or prints errors; :func:`main` does both."""
+app.command(enable.enable)
+app.command(capture.capture)
+app.command(doctor.doctor)
+app.command(analyze.analyze)
+app.command(export.export)
+app.command(runs.app)
+
+
+@app.meta.default
+def launcher(
+    *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    log_level: LogLevel = "warning",
+    store: Path | None = None,
+    json: bool = False,
+) -> int:
+    """Parse the global options, publish them and run the command.
+
+    This is the meta app in front of :data:`app`: it owns the options that
+    come before the command word, publishes them through
+    :mod:`longpole.context` and hands the remaining tokens to the command.
+    That is how ``longpole --json analyze`` gets its flag before the command,
+    the way git does it.
+
+    Args:
+        *tokens: The command and its arguments.
+        log_level: How much to say on stderr: debug, info, warning (the default) or error.
+        store: Run store to use instead of the one resolved from the tree and environment.
+        json: Print results as JSON instead of tables.
+
+    Returns:
+        The command's exit code.
+
+    Raises:
+        UsageError: No command was given.
+    """
+    if not tokens:
+        raise UsageError("no command given; see --help")
+    configure_logging(log_level)
+    cli = CliConfig(log_level=log_level, store=store, json_output=json)
+    with context.activate(cli, load_env()):
+        return app(tokens, exit_on_error=False, print_error=False)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code.
 
-    Builds the application, parses ``argv`` and runs the chosen command. Any
-    failure, a bad command line, an expected error or a bug alike, is logged
-    as one line and becomes exit code 1; ``--log-level debug`` adds the
-    stack. Ctrl-C is left to Python.
+    Parses ``argv`` and runs the chosen command. Any failure, a bad command
+    line, an expected error or a bug alike, is logged as one line and becomes
+    exit code 1; ``--log-level debug`` adds the stack. Ctrl-C is left to
+    Python.
 
     Args:
         argv: Arguments without the program name. ``None`` means
@@ -65,76 +123,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     configure_logging("warning")  # the launcher reconfigures once --log-level is known
     try:
-        return build_app().meta(args, exit_on_error=False, print_error=False)
+        return app.meta(args, exit_on_error=False, print_error=False)
     except Exception as exc:
         log.error("%s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
         return 1
-
-
-def build_app() -> App:
-    """Assemble the application: the global options in front of the commands.
-
-    The commands form the inner app. The global options belong to its meta
-    app, whose only job is to parse them, publish the configuration through
-    :mod:`longpole.context` and hand the remaining tokens to the inner app.
-    That is how ``longpole --json analyze`` gets its flag before the command
-    word, the way git does it. Nothing here exits the process or prints
-    errors; ``main`` does both, so it can be called from a test.
-
-    Returns:
-        The application; call its ``meta`` with the arguments.
-    """
-    app = App(
-        name="longpole",
-        help=(
-            "Find the long pole in your CMake build. longpole records the instrumentation "
-            "data CMake 4.3 and later can write for every configure, compile, link, custom "
-            "command and test step, stores each build as a run, and shows what actually "
-            "gated it."
-        ),
-        version=f"longpole {__version__}",
-        # Fixed width, so the help text does not depend on the terminal it is printed to.
-        console=Console(width=100),
-        help_format="plaintext",
-        result_action="return_int_as_exit_code_else_zero",
-        default_parameter=Parameter(negative="", show_default=False, show_choices=False),
-    )
-    app.command(enable.enable)
-    app.command(capture.capture)
-    app.command(doctor.doctor)
-    app.command(analyze.analyze)
-    app.command(export.export)
-    app.command(runs.app)
-
-    @app.meta.default
-    def launcher(
-        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
-        log_level: LogLevel = "warning",
-        store: Path | None = None,
-        json: bool = False,
-    ) -> int:
-        """Parse the global options, publish them and run the command.
-
-        Args:
-            *tokens: The command and its arguments.
-            log_level: How much to say on stderr: debug, info, warning (the default) or error.
-            store: Run store to use instead of the one resolved from the tree and environment.
-            json: Print results as JSON instead of tables.
-
-        Returns:
-            The command's exit code.
-
-        Raises:
-            UsageError: No command was given.
-        """
-        if not tokens:
-            raise UsageError("no command given; see --help")
-        configure_logging(log_level)
-        cli = CliConfig(log_level=log_level, store=store, json_output=json)
-        with context.activate(cli, load_env()):
-            return app(tokens, exit_on_error=False, print_error=False)
-
-    return app
 
 
 def help_text() -> str:
@@ -147,7 +139,6 @@ def help_text() -> str:
         The help text, wrapped at the app's width, without the trailing
         spaces rich pads lines with.
     """
-    app = build_app()
     buffer = io.StringIO()
     app.meta(["--help"], console=Console(file=buffer, width=app.console.width))
     padded = buffer.getvalue().splitlines()
