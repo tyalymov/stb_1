@@ -94,7 +94,7 @@ def test_unknown_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) ->
     assert main(["frobnicate"]) == 1
     err = capsys.readouterr().err
     assert err.startswith('ERROR: Unknown command "frobnicate"')
-    assert "enable, capture, doctor, analyze, export, runs" in err
+    assert "enable, disable, capture, doctor, analyze, export, runs" in err
 
 
 def test_unknown_option_is_a_usage_error(

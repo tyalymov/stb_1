@@ -43,10 +43,9 @@ class EnableResult:
 
     Attributes:
         scope: ``tree`` or ``global``.
-        query: Path of the query file written or removed.
-        removed: Whether this was a removal.
-        callback: Command line CMake will run, or ``None`` on removal.
-        cmake_version: Version of the CMake consulted.
+        query: Path of the query file written.
+        callback: Command line CMake will run.
+        cmake_version: Version of the ``cmake`` on PATH, or ``None`` when there was none.
         data_version: Data version requested in the query, as ``major.minor``.
         file_api_query: File API query file written for a build tree, or ``None``.
         regenerate_needed: The tree is already configured, so the query takes
@@ -55,10 +54,9 @@ class EnableResult:
 
     scope: str
     query: Path
-    removed: bool
-    callback: str | None
+    callback: str
     cmake_version: str | None
-    data_version: str | None
+    data_version: str
     file_api_query: Path | None
     regenerate_needed: bool
 
@@ -68,7 +66,6 @@ def enable(
     /,
     *,
     everywhere: Annotated[bool, Parameter(name="--global")] = False,
-    remove: bool = False,
     output_format: Output = "text",
 ) -> int:
     """Switch CMake instrumentation on for a build tree, or for every build with --global.
@@ -76,12 +73,11 @@ def enable(
     Write the query file that makes CMake record every step and call
     'longpole capture' afterwards. With a build tree, also ask the File API
     for the target graph and mark the tree as having its own run store.
-    Nothing in the project changes.
+    Nothing in the project changes. 'longpole disable' undoes it.
 
     Args:
         build_dir: Build tree to instrument; may not exist yet.
         everywhere: Instrument every build of this user on this machine instead.
-        remove: Delete the query file written earlier.
         output_format: text, or json for a program.
 
     Returns:
@@ -95,7 +91,7 @@ def enable(
     """
     if (build_dir is None) == (not everywhere):
         raise UsageError("enable: give a build tree or --global, not both and not neither")
-    result = remove_query(build_dir) if remove else write_query(build_dir)
+    result = write_query(build_dir)
     if output_format == "json":
         output.stdout(json.dumps(_as_json(result), indent=2))
     else:
@@ -153,46 +149,11 @@ def write_query(build_dir: Path | None) -> EnableResult:
     return EnableResult(
         scope="global" if build_dir is None else "tree",
         query=query,
-        removed=False,
         callback=callback,
         cmake_version=info.version if info is not None else None,
         data_version=str(data_version),
         file_api_query=file_api_query,
         regenerate_needed=regenerate_needed,
-    )
-
-
-def remove_query(build_dir: Path | None) -> EnableResult:
-    """Delete the query file written by :func:`write_query`, if it is there.
-
-    The in-tree run store is left alone: it holds captured runs. For a build
-    tree the File API query is removed too, since nothing else needs it.
-
-    Args:
-        build_dir: The tree, or ``None`` for the user-level directory.
-
-    Returns:
-        What was removed; ``removed`` is true even when nothing was there.
-
-    Raises:
-        CMakeToolError: Global mode and no ``cmake`` on PATH can say where
-            the user-level directory is.
-        OSError: A file exists but cannot be deleted.
-    """
-    query = query_location(build_dir)
-    query.unlink(missing_ok=True)
-    if build_dir is not None:
-        fileapi.query_path(build_dir).unlink(missing_ok=True)
-    log.info("removed %s", query)
-    return EnableResult(
-        scope="global" if build_dir is None else "tree",
-        query=query,
-        removed=True,
-        callback=None,
-        cmake_version=None,
-        data_version=None,
-        file_api_query=None,
-        regenerate_needed=False,
     )
 
 
@@ -331,8 +292,6 @@ def _describe(result: EnableResult) -> str:
     Returns:
         The text.
     """
-    if result.removed:
-        return f"removed {result.query}"
     lines = [
         f"enabled ({result.scope}): {result.query}",
         f"callback: {result.callback}",

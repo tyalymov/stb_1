@@ -7,6 +7,8 @@ as a run, and shows what actually gated it.
 ╭─ Commands ───────────────────────────────────────────────────────────────────────────────────────╮
 │ analyze      Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.  │
 │ capture      Store the run an instrumentation index describes; CMake runs this at each hook.     │
+│ disable      Switch CMake instrumentation off for a build tree, or for every build with          │
+│              --global.                                                                           │
 │ doctor       Check whether a build tree records its builds, and say what to fix if not.          │
 │ enable       Switch CMake instrumentation on for a build tree, or for every build with --global. │
 │ export       Write a run as a Perfetto trace or a Markdown snapshot.                             │
@@ -30,7 +32,7 @@ from cyclopts import App, Parameter
 from rich.console import Console
 
 from longpole import __version__
-from longpole.commands import analyze, capture, doctor, enable, export, runs
+from longpole.commands import analyze, capture, disable, doctor, enable, export, runs
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +53,7 @@ app = App(
 )
 """The commands. Nothing here exits the process or prints errors; :func:`main` does both."""
 app.command(enable.enable)
+app.command(disable.disable)
 app.command(capture.capture)
 app.command(doctor.doctor)
 app.command(analyze.analyze)

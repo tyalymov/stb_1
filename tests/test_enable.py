@@ -114,26 +114,25 @@ def test_enable_is_idempotent_and_json_reports_the_same_paths(
     report = json.loads(capsys.readouterr().out)
     assert Path(report["query"]).read_bytes() == first
     assert report["scope"] == "tree"
-    assert report["removed"] is False
     assert report["regenerate_needed"] is False
     assert report["file_api_query"] == str(fileapi.query_path(build))
 
 
 @pytest.mark.cmake
-def test_remove_deletes_the_queries_but_keeps_the_store(
+def test_disable_deletes_the_queries_but_keeps_the_store(
     tmp_path: Path, cmake_on_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """--remove undoes enable except for the store, which may already hold runs."""
+    """`disable` undoes `enable` except for the store, which may already hold runs."""
     build = tmp_path / "build"
     assert main(["enable", str(build)]) == 0
-    assert main(["enable", str(build), "--remove"]) == 0
+    assert main(["disable", str(build)]) == 0
     query = build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
     assert not query.exists()
     assert not fileapi.query_path(build).exists()
     assert (build / IN_TREE).is_dir()
     assert capsys.readouterr().out.splitlines()[-1] == f"removed {query}"
 
-    assert main(["enable", str(build), "--remove"]) == 0
+    assert main(["disable", str(build)]) == 0
 
 
 @pytest.mark.cmake
