@@ -179,7 +179,7 @@ def test_empty_index_records_nothing(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    outcome = capture.capture(index, store_override=tmp_path / "store", environ={})
+    outcome = capture.record(index, store_override=tmp_path / "store", environ={})
     assert outcome.run is None
     assert outcome.hook == "postCMakeWorkflow"
     assert not (tmp_path / "store").exists()

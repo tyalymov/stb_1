@@ -16,7 +16,6 @@ run is stored but labelled, and the status line asks for a reconfigure.
 
 from __future__ import annotations
 
-import argparse
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -26,7 +25,6 @@ from pathlib import Path
 from longpole import __version__, context, env, output, units
 from longpole.analyzers.critical_path import CriticalPath, critical_path
 from longpole.cmake import fileapi, snippets, tooling
-from longpole.command import Command
 from longpole.errors import CMakeToolError
 from longpole.model import Graph, Manifest, Run
 from longpole.store import RunStore, new_run_id, resolve_store
@@ -38,19 +36,6 @@ NEEDS_RECONFIGURE_LABEL = "needs-reconfigure"
 
 NO_GRAPH_LABEL = "no-graph"
 """Label of a run captured before the File API answered; the critical path needs the graph."""
-
-
-@dataclass(frozen=True, kw_only=True)
-class CaptureOptions:
-    """Arguments of ``longpole capture``.
-
-    Attributes:
-        index: The index file CMake passed as the last argument.
-        labels: Extra labels for the run, from ``--label``.
-    """
-
-    index: Path
-    labels: tuple[str, ...]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -74,38 +59,17 @@ class Outcome:
     needs_reconfigure: bool
 
 
-def register(parser: argparse.ArgumentParser) -> None:
-    """Declare the arguments of ``capture``.
+def capture(index: Path, /, *, label: tuple[str, ...] = ()) -> int:
+    """Store the run an instrumentation index describes; CMake runs this at each hook.
+
+    Read a CMake instrumentation index and its snippets, add the target graph
+    and the environment, and write the run to the store before CMake deletes
+    the data. Registered as the callback by 'longpole enable'; rarely run by
+    hand. One status line goes to standard error.
 
     Args:
-        parser: The command's subparser.
-    """
-    parser.add_argument(
-        "index", type=Path, metavar="INDEX", help="index file; CMake appends it to the callback"
-    )
-    parser.add_argument(
-        "--label",
-        action="append",
-        default=[],
-        metavar="NAME",
-        help="label the run; may be repeated (a CI run id is added automatically)",
-    )
-
-
-def options_from(namespace: argparse.Namespace) -> CaptureOptions:
-    """Type the parsed arguments.
-
-    Args:
-        namespace: argparse's result for this command.
-
-    Returns:
-        The options.
-    """
-    return CaptureOptions(index=namespace.index, labels=tuple(str(x) for x in namespace.label))
-
-
-def run() -> int:
-    """Store the run described by the index and print one status line to standard error.
+        index: Index file; CMake appends it to the callback.
+        label: Label the run; may be repeated (a CI run id is added automatically).
 
     Returns:
         0; a skipped empty index is a success too.
@@ -118,14 +82,13 @@ def run() -> int:
         FileApiError: A File API reply exists but cannot be read.
         OSError: The store cannot be written.
     """
-    options = context.options(CaptureOptions)
     cli = context.cli()
     environment = context.env()
-    labels = list(options.labels)
+    labels = list(label)
     if environment.ci_run_id is not None:
         labels.append(f"ci:{environment.ci_run_id}")
-    outcome = capture(
-        options.index,
+    outcome = record(
+        index,
         store_override=cli.store,
         environ=environment.environ,
         labels=tuple(labels),
@@ -134,7 +97,7 @@ def run() -> int:
     return 0
 
 
-def capture(
+def record(
     index_path: Path,
     *,
     store_override: Path | None,
@@ -221,7 +184,7 @@ def status_line(outcome: Outcome) -> str:
     """The one line the callback prints.
 
     Args:
-        outcome: What :func:`capture` did.
+        outcome: What :func:`record` did.
 
     Returns:
         ``longpole: <hook> recorded as <id>: N steps, 1.6 s, critical path
@@ -273,17 +236,3 @@ def _generated_before_query(build_dir: Path) -> bool:
     return tooling.generated_before(
         build_dir, tooling.query_files(build_dir, config_dir=config_dir)
     )
-
-
-COMMAND = Command(
-    name="capture",
-    help="store the run an instrumentation index describes; CMake runs this at each hook",
-    description=(
-        "Read a CMake instrumentation index and its snippets, add the target graph and "
-        "the environment, and write the run to the store before CMake deletes the data. "
-        "Registered as the callback by `longpole enable`; rarely run by hand."
-    ),
-    register=register,
-    options_from=options_from,
-    run=run,
-)

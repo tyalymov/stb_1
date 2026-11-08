@@ -8,17 +8,18 @@ run's manifest, ``prune`` deletes old runs by count or by age.
 
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Annotated
+
+from cyclopts import App, Parameter, Token
 
 from longpole import context, output, units
 from longpole.cmake import tooling
-from longpole.command import Command
 from longpole.errors import UsageError
 from longpole.exporters import terminal
 from longpole.model import Manifest
@@ -28,62 +29,6 @@ log = logging.getLogger(__name__)
 
 _DURATION = re.compile(r"^(\d+)([mhd])$")
 _UNIT_SECONDS = {"m": 60, "h": 3600, "d": 86400}
-
-
-@dataclass(frozen=True, kw_only=True)
-class RunsOptions:
-    """Arguments of ``longpole runs`` and its actions.
-
-    Attributes:
-        action: ``show``, ``prune`` or ``None`` for the listing.
-        all_trees: Whether to list every tree's runs from inside a build tree.
-        since: Only runs captured within this long ago.
-        label: Only runs carrying this label.
-        run: Reference for ``show``.
-        keep: ``prune --keep``: how many newest runs survive.
-        older_than: ``prune --older-than``: runs older than this go.
-    """
-
-    action: str | None
-    all_trees: bool
-    since: timedelta | None
-    label: str | None
-    run: str | None
-    keep: int | None
-    older_than: timedelta | None
-
-
-def register(parser: argparse.ArgumentParser) -> None:
-    """Declare the arguments of ``runs``.
-
-    Args:
-        parser: The command's subparser.
-    """
-    parser.add_argument(
-        "--all",
-        dest="all_trees",
-        action="store_true",
-        help="inside a build tree, list every tree's runs instead of this tree's",
-    )
-    parser.add_argument(
-        "--since",
-        type=duration,
-        metavar="AGE",
-        help="only runs captured within AGE, e.g. 90m, 12h or 7d",
-    )
-    parser.add_argument("--label", metavar="NAME", help="only runs carrying this label")
-    actions = parser.add_subparsers(dest="action", metavar="<action>", required=False)
-    show = actions.add_parser("show", help="print one run's manifest")
-    show.add_argument(
-        "run",
-        metavar="RUN",
-        help="run id or prefix, latest, latest~N, sha:<prefix>, label:<name>, or a dump path",
-    )
-    prune = actions.add_parser("prune", help="delete old runs by count or by age")
-    prune.add_argument("--keep", type=int, metavar="N", help="keep only the N newest runs")
-    prune.add_argument(
-        "--older-than", type=duration, metavar="AGE", help="delete runs older than AGE, e.g. 90d"
-    )
 
 
 def duration(text: str) -> timedelta:
@@ -96,72 +41,136 @@ def duration(text: str) -> timedelta:
         The duration.
 
     Raises:
-        argparse.ArgumentTypeError: The text is not a number followed by m, h or d.
+        ValueError: The text is not a number followed by m, h or d.
     """
     match = _DURATION.match(text.strip())
     if match is None:
-        raise argparse.ArgumentTypeError(f"{text!r} is not an age like 90m, 12h or 7d")
+        raise ValueError(f"{text!r} is not an age like 90m, 12h or 7d")
     return timedelta(seconds=int(match[1]) * _UNIT_SECONDS[match[2]])
 
 
-def options_from(namespace: argparse.Namespace) -> RunsOptions:
-    """Type the parsed arguments.
+def _age(_type: type, tokens: list[Token]) -> timedelta:
+    """Adapt :func:`duration` to the converter signature cyclopts calls.
 
     Args:
-        namespace: argparse's result for this command.
+        _type: The annotated type; unused.
+        tokens: The command-line tokens for the option; exactly one.
 
     Returns:
-        The options; fields of actions that were not chosen are ``None``.
-    """
-    return RunsOptions(
-        action=namespace.action,
-        all_trees=bool(namespace.all_trees),
-        since=namespace.since,
-        label=namespace.label,
-        run=getattr(namespace, "run", None),
-        keep=getattr(namespace, "keep", None),
-        older_than=getattr(namespace, "older_than", None),
-    )
-
-
-def run() -> int:
-    """List, show or prune, as asked.
-
-    Returns:
-        0 on success.
+        The duration.
 
     Raises:
-        UsageError: ``prune`` without ``--keep`` or ``--older-than``.
-        UnknownRunError: ``show`` names no run.
-        DumpFormatError: A stored run is malformed.
+        ValueError: The token is not an age.
     """
-    options = context.options(RunsOptions)
+    return duration(tokens[0].value)
+
+
+Age = Annotated[timedelta | None, Parameter(converter=_age, metavar="AGE")]
+"""An option such as ``--since 7d``."""
+
+
+app = App(
+    name="runs",
+    help="List stored runs; 'runs show' prints one, 'runs prune' deletes old ones.",
+)
+
+
+@app.default
+def list_runs(
+    *,
+    all_trees: Annotated[bool, Parameter(name="--all")] = False,
+    since: Age = None,
+    label: str | None = None,
+) -> int:
+    """List the runs in the store, newest last.
+
+    Inside a build tree only that tree's runs are listed unless --all is given.
+
+    Args:
+        all_trees: Inside a build tree, list every tree's runs instead of this tree's.
+        since: Only runs captured within AGE, e.g. 90m, 12h or 7d.
+        label: Only runs carrying this label.
+
+    Returns:
+        0.
+    """
     cli = context.cli()
+    tree = tooling.find_build_tree(context.env().cwd)
+    store = RunStore(resolve_store(cli.store, build_dir=tree, environ=context.env().environ))
+    build_dir = tree.resolve() if tree is not None and not all_trees else None
+    return _list(store, build_dir=build_dir, since=since, label=label, json_output=cli.json_output)
+
+
+@app.command(sort_key=0)
+def show(run: str = "latest", /) -> int:
+    """Print one run's manifest.
+
+    Args:
+        run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
+            or a dump path.
+
+    Returns:
+        0.
+
+    Raises:
+        UnknownRunError: The reference names no run.
+        DumpFormatError: The run on disk is malformed.
+    """
+    return _show(_store(), run, json_output=context.cli().json_output)
+
+
+@app.command(sort_key=1)
+def prune(*, keep: int | None = None, older_than: Age = None) -> int:
+    """Delete old runs by count or by age.
+
+    Args:
+        keep: Keep only the N newest runs.
+        older_than: Delete runs older than AGE, e.g. 90d.
+
+    Returns:
+        0.
+
+    Raises:
+        UsageError: Neither limit was given.
+    """
+    if keep is None and older_than is None:
+        raise UsageError("runs prune: give --keep N, --older-than AGE, or both")
+    return _prune(_store(), keep=keep, older_than=older_than, json_output=context.cli().json_output)
+
+
+def _store() -> RunStore:
+    """The store the global options and the working directory point at.
+
+    Returns:
+        The store.
+    """
     env = context.env()
     tree = tooling.find_build_tree(env.cwd)
-    store = RunStore(resolve_store(cli.store, build_dir=tree, environ=env.environ))
-    if options.action == "show":
-        return _show(store, options.run or "latest", json_output=cli.json_output)
-    if options.action == "prune":
-        return _prune(store, options, json_output=cli.json_output)
-    return _list(store, options, tree=tree, json_output=cli.json_output)
+    return RunStore(resolve_store(context.cli().store, build_dir=tree, environ=env.environ))
 
 
-def _list(store: RunStore, options: RunsOptions, *, tree: Path | None, json_output: bool) -> int:
+def _list(
+    store: RunStore,
+    *,
+    build_dir: Path | None,
+    since: timedelta | None,
+    label: str | None,
+    json_output: bool,
+) -> int:
     """Print the catalogue.
 
     Args:
         store: The store.
-        options: Filters.
-        tree: The build tree the working directory is in, or ``None``.
+        build_dir: Only runs of this tree, or ``None`` for every tree.
+        since: Only runs captured within this long ago, or ``None``.
+        label: Only runs carrying this label, or ``None``.
         json_output: JSON instead of a table.
 
     Returns:
         0.
     """
-    build_dir = tree.resolve() if tree is not None and not options.all_trees else None
-    since = datetime.now(UTC) - options.since if options.since is not None else None
-    summaries = store.list(build_dir=build_dir, label=options.label, since=since)
+    cutoff = datetime.now(UTC) - since if since is not None else None
+    summaries = store.list(build_dir=build_dir, label=label, since=cutoff)
     if json_output:
         output.stdout(json.dumps([asdict(summary) for summary in summaries], indent=2))
         return 0
@@ -286,40 +295,24 @@ def _git_line(manifest: Manifest) -> str:
     return text
 
 
-def _prune(store: RunStore, options: RunsOptions, *, json_output: bool) -> int:
+def _prune(
+    store: RunStore, *, keep: int | None, older_than: timedelta | None, json_output: bool
+) -> int:
     """Delete runs and say which.
 
     Args:
         store: The store.
-        options: ``keep`` and ``older_than``; at least one must be set.
+        keep: How many newest runs survive, or ``None``.
+        older_than: Runs older than this go, or ``None``.
         json_output: JSON list instead of one id per line.
 
     Returns:
         0.
-
-    Raises:
-        UsageError: Neither limit was given.
     """
-    if options.keep is None and options.older_than is None:
-        raise UsageError("runs prune: give --keep N, --older-than AGE, or both")
-    deleted = store.prune(keep=options.keep, older_than=options.older_than)
+    deleted = store.prune(keep=keep, older_than=older_than)
     if json_output:
         output.stdout(json.dumps(deleted))
     elif deleted:
         output.stdout("\n".join(deleted))
     log.info("deleted %d run(s) from %s", len(deleted), store.root)
     return 0
-
-
-COMMAND = Command(
-    name="runs",
-    help="list stored runs; 'runs show' prints one, 'runs prune' deletes old ones",
-    description=(
-        "List the runs in the store, newest last. Inside a build tree only that tree's runs "
-        "are listed unless --all is given. 'runs show RUN' prints a run's manifest; "
-        "'runs prune' deletes runs beyond a count or an age."
-    ),
-    register=register,
-    options_from=options_from,
-    run=run,
-)

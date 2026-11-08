@@ -1,4 +1,4 @@
-"""Rewrite the module docstring of ``longpole/cli.py`` from the parser's ``--help`` text.
+"""Rewrite the module docstring of ``longpole/cli.py`` from the ``--help`` text.
 
 The docstring doubles as the program's header and a test keeps it equal to
 ``longpole --help``. Run this after adding a command or changing a help
@@ -12,8 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from longpole.cli_config import build_parser
-from longpole.commands import COMMANDS
+from longpole.cli import help_text
 
 CLI_MODULE = Path(__file__).resolve().parents[1] / "src" / "longpole" / "cli.py"
 
@@ -30,7 +29,7 @@ def main() -> int:
         sys.stderr.write(f"{CLI_MODULE}: expected a module docstring first\n")
         return 1
     end = text.index('"""', 3)
-    updated = '"""' + build_parser(COMMANDS).format_help() + text[end:]
+    updated = '"""' + help_text() + text[end:]
     if updated != text:
         CLI_MODULE.write_text(updated, encoding="utf-8")
     return 0

@@ -17,18 +17,19 @@ each step is written into the build system at generate time.
 
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 import shutil
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Annotated
+
+from cyclopts import Parameter
 
 from longpole import context, output
 from longpole.cmake import fileapi, tooling
-from longpole.command import Command
-from longpole.errors import CMakeToolError, UnsupportedCMakeError
+from longpole.errors import CMakeToolError, UnsupportedCMakeError, UsageError
 from longpole.model import DataVersion
 from longpole.store import IN_TREE
 
@@ -59,23 +60,6 @@ PROCESS_METRICS_MINOR = 2
 
 
 @dataclass(frozen=True, kw_only=True)
-class EnableOptions:
-    """Arguments of ``longpole enable``.
-
-    Attributes:
-        build_dir: Build tree to instrument; ``None`` with ``--global``.
-        everywhere: ``--global``: write the query to the user-level directory.
-        remove: ``--remove``: delete the query instead of writing it.
-        cmake: ``--cmake``: executable to ask about its version and paths.
-    """
-
-    build_dir: Path | None
-    everywhere: bool
-    remove: bool
-    cmake: Path | None
-
-
-@dataclass(frozen=True, kw_only=True)
 class EnableResult:
     """What the command did, for the text and JSON reports.
 
@@ -101,72 +85,42 @@ class EnableResult:
     regenerate_needed: bool
 
 
-def register(parser: argparse.ArgumentParser) -> None:
-    """Declare the arguments of ``enable``.
+def enable(
+    build_dir: Path | None = None,
+    /,
+    *,
+    everywhere: Annotated[bool, Parameter(name="--global")] = False,
+    remove: bool = False,
+    cmake: Path | None = None,
+) -> int:
+    """Switch CMake instrumentation on for a build tree, or for every build with --global.
+
+    Write the query file that makes CMake record every step and call
+    'longpole capture' afterwards. With a build tree, also ask the File API
+    for the target graph and mark the tree as having its own run store.
+    Nothing in the project changes.
 
     Args:
-        parser: The command's subparser.
-    """
-    scope = parser.add_mutually_exclusive_group(required=True)
-    scope.add_argument(
-        "build_dir",
-        nargs="?",
-        type=Path,
-        metavar="BUILD_DIR",
-        help="build tree to instrument; may not exist yet",
-    )
-    scope.add_argument(
-        "--global",
-        dest="everywhere",
-        action="store_true",
-        help="instrument every build of this user on this machine instead",
-    )
-    parser.add_argument(
-        "--remove", action="store_true", help="delete the query file written earlier"
-    )
-    parser.add_argument(
-        "--cmake",
-        type=Path,
-        metavar="PATH",
-        help="cmake executable to consult; default: the one that configured the tree, "
-        "else the first on PATH",
-    )
-
-
-def options_from(namespace: argparse.Namespace) -> EnableOptions:
-    """Type the parsed arguments.
-
-    Args:
-        namespace: argparse's result for this command.
-
-    Returns:
-        The options.
-    """
-    return EnableOptions(
-        build_dir=namespace.build_dir,
-        everywhere=bool(namespace.everywhere),
-        remove=bool(namespace.remove),
-        cmake=namespace.cmake,
-    )
-
-
-def run() -> int:
-    """Write or remove the query file and report what was done.
+        build_dir: Build tree to instrument; may not exist yet.
+        everywhere: Instrument every build of this user on this machine instead.
+        remove: Delete the query file written earlier.
+        cmake: cmake executable to consult; default: the one that configured
+            the tree, else the first on PATH.
 
     Returns:
         0 on success; failures raise.
 
     Raises:
+        UsageError: Neither a build tree nor ``--global`` was given, or both were.
         CMakeToolError: No usable ``cmake`` executable could be found or run.
         UnsupportedCMakeError: The executable predates CMake 4.3.
         OSError: A query directory cannot be created or written.
     """
-    options = context.options(EnableOptions)
-    cmake = find_cmake(options.cmake, options.build_dir)
-    if options.remove:
-        result = disable(cmake, options.build_dir)
-    else:
-        result = enable(cmake, options.build_dir)
+    if (build_dir is None) == (not everywhere):
+        raise UsageError("enable: give a build tree or --global, not both and not neither")
+    executable = find_cmake(cmake, build_dir)
+    worker = remove_query if remove else write_query
+    result = worker(executable, build_dir)
     if context.cli().json_output:
         output.stdout(json.dumps(_as_json(result), indent=2))
     else:
@@ -174,7 +128,7 @@ def run() -> int:
     return 0
 
 
-def enable(cmake: Path, build_dir: Path | None) -> EnableResult:
+def write_query(cmake: Path, build_dir: Path | None) -> EnableResult:
     """Write the query file for a build tree, or for the user when ``build_dir`` is ``None``.
 
     Writing the same file again is harmless: the content is derived from the
@@ -224,8 +178,8 @@ def enable(cmake: Path, build_dir: Path | None) -> EnableResult:
     )
 
 
-def disable(cmake: Path, build_dir: Path | None) -> EnableResult:
-    """Delete the query file written by :func:`enable`, if it is there.
+def remove_query(cmake: Path, build_dir: Path | None) -> EnableResult:
+    """Delete the query file written by :func:`write_query`, if it is there.
 
     The in-tree run store is left alone: it holds captured runs. For a build
     tree the File API query is removed too, since nothing else needs it.
@@ -397,18 +351,3 @@ def _describe(result: EnableResult) -> str:
             "launcher is written into the build system"
         )
     return "\n".join(lines)
-
-
-COMMAND = Command(
-    name="enable",
-    help="switch CMake instrumentation on for a build tree, or for every build with --global",
-    description=(
-        "Write the query file that makes CMake record every step and call "
-        "`longpole capture` afterwards. With a build tree, also ask the File API for "
-        "the target graph and mark the tree as having its own run store. "
-        "Nothing in the project changes."
-    ),
-    register=register,
-    options_from=options_from,
-    run=run,
-)

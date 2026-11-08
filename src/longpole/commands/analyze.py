@@ -9,15 +9,12 @@ store. A reference selects any other run: an id or prefix, ``latest``,
 
 from __future__ import annotations
 
-import argparse
 import json
-from dataclasses import dataclass
 from pathlib import Path
 
 from longpole import context, output
 from longpole.analyzers.report import build_report, to_json
 from longpole.cmake import tooling
-from longpole.command import Command
 from longpole.errors import UnknownRunError
 from longpole.exporters import terminal
 from longpole.model import Run
@@ -26,55 +23,18 @@ from longpole.store import RunStore, resolve_store
 DEFAULT_TOP = 10
 
 
-@dataclass(frozen=True, kw_only=True)
-class AnalyzeOptions:
-    """Arguments of ``longpole analyze``.
+def analyze(run: str | None = None, /, *, top: int = DEFAULT_TOP) -> int:
+    """Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.
 
-    Attributes:
-        run: Run reference, or ``None`` for the default choice.
-        top: Rows per slowest-items table.
-    """
-
-    run: str | None
-    top: int
-
-
-def register(parser: argparse.ArgumentParser) -> None:
-    """Declare the arguments of ``analyze``.
+    Print the report of one stored run: totals and phases, the slowest
+    targets, sources, custom commands and tests, the critical path, the
+    parallelism over time and the artifact sizes. Defaults to the newest run
+    of the build tree you are in, or the newest run in the store.
 
     Args:
-        parser: The command's subparser.
-    """
-    parser.add_argument(
-        "run",
-        nargs="?",
-        metavar="RUN",
-        help="run id or prefix, latest, latest~N, sha:<prefix>, label:<name>, or a dump path; "
-        "default: the newest run of the build tree you are in, else the newest in the store",
-    )
-    parser.add_argument(
-        "--top",
-        type=int,
-        default=DEFAULT_TOP,
-        metavar="N",
-        help=f"rows per table (default {DEFAULT_TOP})",
-    )
-
-
-def options_from(namespace: argparse.Namespace) -> AnalyzeOptions:
-    """Type the parsed arguments.
-
-    Args:
-        namespace: argparse's result for this command.
-
-    Returns:
-        The options.
-    """
-    return AnalyzeOptions(run=namespace.run, top=int(namespace.top))
-
-
-def run() -> int:
-    """Load the run, analyse it and print the report.
+        run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
+            or a dump path.
+        top: Rows per table.
 
     Returns:
         0 on success.
@@ -83,12 +43,11 @@ def run() -> int:
         UnknownRunError: The reference names no run, or there is no run to default to.
         DumpFormatError: The stored run is malformed.
     """
-    options = context.options(AnalyzeOptions)
     cli = context.cli()
     env = context.env()
     tree = tooling.find_build_tree(env.cwd)
     store = RunStore(resolve_store(cli.store, build_dir=tree, environ=env.environ))
-    report = build_report(load_run(store, options.run, tree), top=options.top)
+    report = build_report(load_run(store, run, tree), top=top)
     if cli.json_output:
         output.stdout(json.dumps(to_json(report), indent=2))
     else:
@@ -130,18 +89,3 @@ def load_run(store: RunStore, ref: str | None, tree: Path | None) -> Run:
             f"no runs in {store.root}; build with instrumentation enabled first (longpole enable)"
         )
     return latest
-
-
-COMMAND = Command(
-    name="analyze",
-    help="report on a run: totals, phases, slowest items, critical path, parallelism, sizes",
-    description=(
-        "Print the report of one stored run: totals and phases, the slowest targets, sources, "
-        "custom commands and tests, the critical path, the parallelism over time and the "
-        "artifact sizes. Defaults to the newest run of the build tree you are in, or the "
-        "newest run in the store."
-    ),
-    register=register,
-    options_from=options_from,
-    run=run,
-)

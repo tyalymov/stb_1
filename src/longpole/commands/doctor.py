@@ -11,7 +11,6 @@ also works as a gate in a script.
 
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 import shutil
@@ -22,7 +21,6 @@ from typing import cast
 
 from longpole import context, output
 from longpole.cmake import fileapi, tooling
-from longpole.command import Command
 from longpole.errors import CMakeToolError
 from longpole.exporters import terminal
 from longpole.jsonfields import FieldError, load_object
@@ -36,19 +34,6 @@ PROBLEM = "problem"
 
 SUPPORTED_GENERATOR_WORDS: tuple[str, ...] = ("Makefiles", "Ninja", "FASTBuild")
 """A generator whose name contains one of these can run the recording launcher."""
-
-
-@dataclass(frozen=True, kw_only=True)
-class DoctorOptions:
-    """Arguments of ``longpole doctor``.
-
-    Attributes:
-        build_dir: The build tree to examine.
-        cmake: ``--cmake``: executable to consult instead of the tree's or PATH's.
-    """
-
-    build_dir: Path
-    cmake: Path | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -90,45 +75,25 @@ class Report:
         return tuple(seen)
 
 
-def register(parser: argparse.ArgumentParser) -> None:
-    """Declare the arguments of ``doctor``.
+def doctor(build_dir: Path, /, *, cmake: Path | None = None) -> int:
+    """Check whether a build tree records its builds, and say what to fix if not.
+
+    Look at the cmake executable, the generator, the query files, the build
+    system's age relative to them, the File API reply and the run store, and
+    list what needs doing. Exit code 1 when something does.
 
     Args:
-        parser: The command's subparser.
-    """
-    parser.add_argument("build_dir", type=Path, metavar="BUILD_DIR", help="build tree to examine")
-    parser.add_argument(
-        "--cmake",
-        type=Path,
-        metavar="PATH",
-        help="cmake executable to consult; default: the one that configured the tree, "
-        "else the first on PATH",
-    )
-
-
-def options_from(namespace: argparse.Namespace) -> DoctorOptions:
-    """Type the parsed arguments.
-
-    Args:
-        namespace: argparse's result for this command.
-
-    Returns:
-        The options.
-    """
-    return DoctorOptions(build_dir=namespace.build_dir, cmake=namespace.cmake)
-
-
-def run() -> int:
-    """Examine the tree and print the findings.
+        build_dir: Build tree to examine.
+        cmake: cmake executable to consult; default: the one that configured
+            the tree, else the first on PATH.
 
     Returns:
         0 when no finding asks for an action, 1 otherwise.
     """
-    options = context.options(DoctorOptions)
     cli = context.cli()
     report = examine(
-        options.build_dir,
-        cmake_override=options.cmake,
+        build_dir,
+        cmake_override=cmake,
         store_override=cli.store,
         environ=context.env().environ,
     )
@@ -478,17 +443,3 @@ def _as_json(report: Report) -> dict[str, object]:
         "actions": list(report.actions),
         "findings": [asdict(finding) for finding in report.findings],
     }
-
-
-COMMAND = Command(
-    name="doctor",
-    help="check whether a build tree records its builds, and say what to fix if not",
-    description=(
-        "Look at the cmake executable, the generator, the query files, the build system's "
-        "age relative to them, the File API reply and the run store, and list what needs "
-        "doing. Exit code 1 when something does."
-    ),
-    register=register,
-    options_from=options_from,
-    run=run,
-)

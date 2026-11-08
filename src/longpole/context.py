@@ -2,8 +2,9 @@
 
 ``main`` parses the command line and reads the environment exactly once,
 then publishes both results here. Any module can read them back with
-:func:`cli`, :func:`env` and :func:`options` instead of receiving them as
-parameters through every call.
+:func:`cli` and :func:`env` instead of receiving them as parameters through
+every call. A command's own options are not here: they are the parameters
+of its function.
 
 The storage is :mod:`contextvars`, not module globals. :func:`activate`
 sets the values for the duration of a block and restores the previous state
@@ -17,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from longpole.cli_config import CliConfig
@@ -25,8 +26,6 @@ if TYPE_CHECKING:
 
 _cli: ContextVar[CliConfig] = ContextVar("longpole_cli")
 _env: ContextVar[EnvConfig] = ContextVar("longpole_env")
-
-T = TypeVar("T")
 
 
 @contextmanager
@@ -81,27 +80,3 @@ def env() -> EnvConfig:
         return _env.get()
     except LookupError:
         raise RuntimeError("no active configuration: context.activate() was not entered") from None
-
-
-def options(kind: type[T]) -> T:
-    """The active command's own options, checked to be of the expected type.
-
-    A command module declares its options as a frozen dataclass and builds it
-    in ``options_from``; its ``run`` calls this with that class to get them
-    back typed.
-
-    Args:
-        kind: The options class the calling command expects.
-
-    Returns:
-        The options object.
-
-    Raises:
-        RuntimeError: No configuration is active.
-        TypeError: The active command's options are of another class, which
-            means a command's ``run`` was called under a different command.
-    """
-    value = cli().options
-    if not isinstance(value, kind):
-        raise TypeError(f"active options are {type(value).__name__}, not {kind.__name__}")
-    return value

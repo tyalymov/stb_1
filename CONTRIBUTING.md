@@ -77,15 +77,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        cli = parse_cli(args)
-        configure_logging(cli.log_level)
-        env = load_env()
-        with context.activate(cli, env):
-            return COMMANDS[cli.command].run()
-    except HelpPrinted:
-        return 0
+        result = build_app(COMMANDS).meta(args, exit_on_error=False, print_error=False)
+        return 0 if result is None else int(result)
+    except CycloptsError as exc:
+        output.stderr(f"{PROGRAM}: error: {exc}")
+        return UsageError.exit_code
     except UsageError as exc:
-        output.stderr(str(exc))
+        output.stderr(f"{PROGRAM}: error: {exc}")
         return exc.exit_code
     except LongpoleError as exc:
         log.error("%s", exc)
@@ -108,37 +106,42 @@ The rules behind that shape:
 - `argv` never contains the program name. `__main__` passes `sys.argv[1:]`
   explicitly; tests pass a list. The `None` branch exists only for the
   console script entry point, which calls `main()` without arguments.
-- `parse_cli` uses argparse with a git-like layout: global flags first
-  (`--log-level`, `--store`, `--json`), then a command and its flags. The
-  parser never exits the process. Parse errors become `UsageError` (exit
-  code 2); `--help` prints the help and raises `HelpPrinted`, which `main`
-  turns into exit code 0. Otherwise `main` could not be called from a test.
+- The command line is parsed by [cyclopts](https://cyclopts.readthedocs.io/)
+  with a git-like layout: global flags first (`--log-level`, `--store`,
+  `--json`), then a command and its flags. The global flags belong to the
+  app's *meta* app in `build_app`: it parses them, publishes the
+  configuration and hands the remaining tokens to the inner app that holds
+  the commands. Nothing exits the process: `exit_on_error=False` turns parse
+  errors into `CycloptsError`, which `main` reports as exit code 2 like any
+  `UsageError`; `--help` and `--version` print and return `None`. Otherwise
+  `main` could not be called from a test.
 - `load_env` reads everything from the environment in one place:
   environment variables, XDG paths, tool versions.
 - `CliConfig` and `EnvConfig` are frozen dataclasses. They are published
   through `contextvars` in `longpole.context`: `context.activate(cli, env)`
   sets them for the duration of a block and restores the previous values
   on exit; `context.cli()` and `context.env()` read them from anywhere.
-  Only `main` and tests call `activate`. The reset on exit is what lets a
-  test call `main([...])` many times in one process without state leaking
-  between calls.
-- Each command lives in its own file under `longpole/commands/` and exposes
-  one `Command` record (`longpole/command.py`): its `name`, one-line `help`,
-  a `description` paragraph and three functions. `register(parser)` adds the
-  command's own arguments to the subparser the entry point created for it.
-  `options_from(namespace)` turns the parsed arguments into the command's
-  own frozen options dataclass, so nothing downstream touches the untyped
-  `argparse.Namespace`. `run() -> int` does the work, reading
-  `context.cli()`, `context.env()` and its options back with
-  `context.options(Options)`, which checks the type. `commands/__init__.py`
-  holds the registry; the entry module only builds the parser and
-  dispatches.
+  Only the meta app and tests call `activate`. The reset on exit is what
+  lets a test call `main([...])` many times in one process without state
+  leaking between calls.
+- Each command lives in its own file under `longpole/commands/` and is a
+  plain function: its signature is its command line. Parameters before `/`
+  are positional arguments, parameters after `*` are `--options`, the
+  annotations give the types, the defaults make them optional, and the
+  `Args:` section of its docstring is the help text, with the docstring's
+  first paragraphs as the command's description. A command with actions of
+  its own (`runs show`, `runs prune`) is a cyclopts `App` whose default
+  function handles the bare command. The function reads the global options
+  from `context.cli()` and `context.env()`, does the work and returns the
+  exit code. `commands/__init__.py` lists the commands in `--help` order;
+  `cli.py` builds the app from that list.
 - Errors are a small hierarchy under `LongpoleError`, each with an
   `exit_code`. Low-level exceptions are wrapped at the layer boundary with
   a message a user can act on.
 - The module docstring of an entry module is the `--help` output, verbatim.
-  A test compares the two, with the help formatter pinned to a fixed width
-  so the text does not depend on the terminal.
+  A test compares the two, with the help rendered at a fixed width so the
+  text does not depend on the terminal; `scripts/sync-cli-help.py`
+  regenerates the docstring after a help string changes.
 
 ## Logging and output
 
