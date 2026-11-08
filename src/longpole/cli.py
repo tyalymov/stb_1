@@ -93,7 +93,7 @@ def launcher(
     """
     if not tokens:
         raise UsageError("no command given; see --help")
-    configure_logging(log_level)
+    logging.getLogger("longpole").setLevel(log_level.upper())
     cli = CliConfig(log_level=log_level, store=store, json_output=json)
     with context.activate(cli, load_env()):
         return app(tokens, exit_on_error=False, print_error=False)
@@ -117,31 +117,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         return value otherwise; 1 on any exception.
     """
     args = list(sys.argv[1:] if argv is None else argv)
-    configure_logging("warning")  # the launcher reconfigures once --log-level is known
+    # Our own handler on the package logger: the one Python falls back to prints bare
+    # text and nothing below WARNING. Rebuilt on every call because pytest swaps
+    # sys.stderr per test and a handler keeps the stream it was created with.
+    logger = logging.getLogger("longpole")
+    logger.handlers.clear()
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)  # the launcher applies --log-level
     try:
         return app.meta(args, exit_on_error=False, print_error=False)
     except Exception as exc:
         log.error("%s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
         return 1
-
-
-def configure_logging(level: str) -> None:
-    """Send the ``longpole`` logger hierarchy to standard error at the given level.
-
-    Called more than once per process: by :func:`main` before parsing and by
-    :func:`launcher` once ``--log-level`` is known, and by every ``main([...])``
-    a test makes. The handler is rebuilt each time so it writes to whatever
-    ``sys.stderr`` is right now: pytest swaps the stream per test, and a
-    handler created for an earlier test would otherwise keep writing into a
-    closed capture. Only the ``longpole`` logger is touched; the libraries'
-    loggers keep whatever they have.
-
-    Args:
-        level: One of :data:`longpole.cli_config.LogLevel`, any case.
-    """
-    logger = logging.getLogger("longpole")
-    logger.setLevel(level.upper())
-    logger.handlers.clear()
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-    logger.addHandler(handler)

@@ -76,7 +76,12 @@ inside pytest by importing `main` and passing a list of arguments.
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
-    configure_logging("warning")  # the launcher reconfigures once --log-level is known
+    logger = logging.getLogger("longpole")
+    logger.handlers.clear()  # pytest swaps sys.stderr per test; the handler must follow
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)  # the launcher applies --log-level
     try:
         return app.meta(args, exit_on_error=False, print_error=False)
     except Exception as exc:
@@ -137,8 +142,9 @@ The rules behind that shape:
 ## Logging and output
 
 Use the standard `logging` module with one logger per module
-(`log = logging.getLogger(__name__)`). `main` configures logging once from
-`--log-level`; all log output goes to stderr. Standard output carries only
+(`log = logging.getLogger(__name__)`). `main` puts one stderr handler on the
+`longpole` logger and the launcher sets its level from `--log-level`; all
+log output goes to stderr. Standard output carries only
 the result of the command (tables, JSON) because tests and pipes parse it.
 The output layer is `longpole/output.py`: `output.stdout(text)` for
 results, `output.stderr(text)` for messages to the person at the terminal.
