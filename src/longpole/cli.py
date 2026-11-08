@@ -43,15 +43,6 @@ log = logging.getLogger(__name__)
 
 PROGRAM = "longpole"
 
-DESCRIPTION = (
-    "Find the long pole in your CMake build. longpole records the instrumentation data "
-    "CMake 4.3 and later can write for every configure, compile, link, custom command and "
-    "test step, stores each build as a run, and shows what actually gated it."
-)
-
-HELP_WIDTH = 100
-"""Column the help text wraps at. Fixed so the text does not depend on the terminal."""
-
 EXIT_UNEXPECTED = 70
 """Exit code for an exception nothing expected; ``EX_SOFTWARE`` in ``sysexits.h``."""
 
@@ -118,9 +109,15 @@ def build_app(commands: Sequence[Callable[..., int] | App]) -> App:
     """
     app = App(
         name=PROGRAM,
-        help=DESCRIPTION,
+        help=(
+            "Find the long pole in your CMake build. longpole records the instrumentation "
+            "data CMake 4.3 and later can write for every configure, compile, link, custom "
+            "command and test step, stores each build as a run, and shows what actually "
+            "gated it."
+        ),
         version=f"{PROGRAM} {__version__}",
-        console=Console(width=HELP_WIDTH),
+        # Fixed width, so the help text does not depend on the terminal it is printed to.
+        console=Console(width=100),
         help_format="plaintext",
         result_action="return_value",
         default_parameter=Parameter(negative="", show_default=False, show_choices=False),
@@ -174,11 +171,12 @@ def help_text(commands: Sequence[Callable[..., int] | App] = COMMANDS) -> str:
         commands: Commands to list; the registry by default.
 
     Returns:
-        The help text, wrapped at :data:`HELP_WIDTH`, without the trailing
+        The help text, wrapped at the app's width, without the trailing
         spaces rich pads lines with.
     """
+    app = build_app(commands)
     buffer = io.StringIO()
-    build_app(commands).meta(["--help"], console=Console(file=buffer, width=HELP_WIDTH))
+    app.meta(["--help"], console=Console(file=buffer, width=app.console.width))
     padded = buffer.getvalue().splitlines()
     return "".join(line.rstrip() + "\n" for line in padded)
 
@@ -201,5 +199,5 @@ def configure_logging(level: str) -> None:
             logger.removeHandler(handler)
     handler = logging.StreamHandler(sys.stderr)
     handler.set_name(HANDLER_NAME)
-    handler.setFormatter(logging.Formatter("longpole: %(levelname)s: %(message)s"))
+    handler.setFormatter(logging.Formatter(f"{PROGRAM}: %(levelname)s: %(message)s"))
     logger.addHandler(handler)
