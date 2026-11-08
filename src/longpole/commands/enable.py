@@ -95,8 +95,7 @@ def enable(
     """
     if (build_dir is None) == (not everywhere):
         raise UsageError("enable: give a build tree or --global, not both and not neither")
-    worker = remove_query if remove else write_query
-    result = worker(build_dir)
+    result = remove_query(build_dir) if remove else write_query(build_dir)
     if output_format == "json":
         output.stdout(json.dumps(_as_json(result), indent=2))
     else:
