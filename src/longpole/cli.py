@@ -5,10 +5,10 @@ later can write for every configure, compile, link, custom command and test step
 as a run, and shows what actually gated it.
 
 ╭─ Commands ───────────────────────────────────────────────────────────────────────────────────────╮
-│ enable       Switch CMake instrumentation on for a build tree, or for every build with --global. │
+│ analyze      Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.  │
 │ capture      Store the run an instrumentation index describes; CMake runs this at each hook.     │
 │ doctor       Check whether a build tree records its builds, and say what to fix if not.          │
-│ analyze      Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.  │
+│ enable       Switch CMake instrumentation on for a build tree, or for every build with --global. │
 │ export       Write a run as a Perfetto trace or a Markdown snapshot.                             │
 │ runs         List stored runs; 'runs show' prints one, 'runs prune' deletes old ones.            │
 │ --help (-h)  Display this message and exit.                                                      │
@@ -99,20 +99,12 @@ def build_app() -> App:
         result_action="return_int_as_exit_code_else_zero",
         default_parameter=Parameter(negative="", show_default=False, show_choices=False),
     )
-    commands = (
-        enable.enable,
-        capture.capture,
-        doctor.doctor,
-        analyze.analyze,
-        export.export,
-        runs.app,
-    )
-    for position, command in enumerate(commands):  # position: the order --help lists them
-        if isinstance(command, App):
-            command.sort_key = position
-            app.command(command)
-        else:
-            app.command(command, sort_key=position)
+    app.command(enable.enable)
+    app.command(capture.capture)
+    app.command(doctor.doctor)
+    app.command(analyze.analyze)
+    app.command(export.export)
+    app.command(runs.app)
 
     @app.meta.default
     def launcher(

@@ -101,7 +101,7 @@ def list_runs(
     return _list(store, build_dir=build_dir, since=since, label=label, json_output=cli.json_output)
 
 
-@app.command(sort_key=0)
+@app.command
 def show(run: str = "latest", /) -> int:
     """Print one run's manifest.
 
@@ -119,7 +119,7 @@ def show(run: str = "latest", /) -> int:
     return _show(_store(), run, json_output=context.cli().json_output)
 
 
-@app.command(sort_key=1)
+@app.command
 def prune(*, keep: int | None = None, older_than: Age = None) -> int:
     """Delete old runs by count or by age.
 
