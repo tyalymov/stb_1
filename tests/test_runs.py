@@ -80,10 +80,10 @@ def test_inside_a_tree_only_its_runs_are_listed_unless_all(
         )
     )
     monkeypatch.chdir(tree)
-    assert main(["runs", "--store", str(store.root), "--json"]) == 0
+    assert main(["runs", "--store", str(store.root), "--output-format", "json"]) == 0
     ids = [entry["run_id"] for entry in json.loads(capsys.readouterr().out)]
     assert ids == ["20261031T120000Z-000001"]
-    assert main(["runs", "--all", "--store", str(store.root), "--json"]) == 0
+    assert main(["runs", "--all", "--store", str(store.root), "--output-format", "json"]) == 0
     assert len(json.loads(capsys.readouterr().out)) == 2
 
 
@@ -104,9 +104,14 @@ def test_filters_by_label_and_age(
             labels=("ci:42",),
         )
     )
-    assert main(["runs", "--label", "ci:42", "--store", str(store.root), "--json"]) == 0
+    assert (
+        main(["runs", "--label", "ci:42", "--store", str(store.root), "--output-format", "json"])
+        == 0
+    )
     assert [e["labels"] for e in json.loads(capsys.readouterr().out)] == [["ci:42"]]
-    assert main(["runs", "--since", "1h", "--store", str(store.root), "--json"]) == 0
+    assert (
+        main(["runs", "--since", "1h", "--store", str(store.root), "--output-format", "json"]) == 0
+    )
     listed = json.loads(capsys.readouterr().out)
     assert len(listed) == 1 and listed[0]["labels"] == ["ci:42"]
     assert main(["runs", "--since", "yesterday", "--store", str(store.root)]) == 1
@@ -123,7 +128,7 @@ def test_show_prints_the_manifest(
     assert "20261031T120100Z-000002" in out
     assert "/work/project/build" in out
     assert "0123456789ab main" in out
-    assert main(["runs", "show", "latest~1", "--store", str(store), "--json"]) == 0
+    assert main(["runs", "show", "latest~1", "--store", str(store), "--output-format", "json"]) == 0
     document = json.loads(capsys.readouterr().out)
     assert document["run_id"] == "20261031T120000Z-000001"
     assert document["steps"] == 8
@@ -140,5 +145,5 @@ def test_prune_deletes_old_runs_and_needs_a_limit(
     assert "give --keep" in capsys.readouterr().err
     assert main(["runs", "prune", "--keep", "1", "--store", str(store)]) == 0
     assert capsys.readouterr().out.strip() == "20261031T120000Z-000001"
-    assert main(["runs", "--store", str(store), "--json"]) == 0
+    assert main(["runs", "--store", str(store), "--output-format", "json"]) == 0
     assert [e["run_id"] for e in json.loads(capsys.readouterr().out)] == ["20261031T120100Z-000002"]

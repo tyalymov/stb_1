@@ -11,7 +11,7 @@ also works as a gate in a script.
 
 from __future__ import annotations
 
-import json as json_module
+import json
 import logging
 import os
 import shutil
@@ -22,7 +22,7 @@ from typing import cast
 
 from longpole import output
 from longpole.cmake import fileapi, tooling
-from longpole.commands.options import Json, Store
+from longpole.commands.options import Output, Store
 from longpole.errors import CMakeToolError
 from longpole.exporters import terminal
 from longpole.jsonfields import FieldError, load_object
@@ -78,7 +78,12 @@ class Report:
 
 
 def doctor(
-    build_dir: Path, /, *, cmake: Path | None = None, store: Store = None, json: Json = False
+    build_dir: Path,
+    /,
+    *,
+    cmake: Path | None = None,
+    store: Store = None,
+    output_format: Output = "text",
 ) -> int:
     """Check whether a build tree records its builds, and say what to fix if not.
 
@@ -91,14 +96,14 @@ def doctor(
         cmake: cmake executable to consult; default: the one that configured
             the tree, else the first on PATH.
         store: Run store to report on instead of the resolved one.
-        json: Print the report as JSON instead of a table.
+        output_format: text, or json for a program.
 
     Returns:
         0 when no finding asks for an action, 1 otherwise.
     """
     report = examine(build_dir, cmake_override=cmake, store_override=store, environ=os.environ)
-    if json:
-        output.stdout(json_module.dumps(_as_json(report), indent=2))
+    if output_format == "json":
+        output.stdout(json.dumps(_as_json(report), indent=2))
     else:
         output.stdout(describe(report))
     return 1 if report.actions else 0

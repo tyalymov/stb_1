@@ -67,7 +67,9 @@ def test_unconfigured_tree_without_query_needs_enable(
 ) -> None:
     """A fresh directory: the only problem is the missing query, and the fix is named."""
     build = tmp_path / "build"
-    assert main(["doctor", str(build), "--cmake", str(cmake_binary), "--json"]) == 1
+    assert (
+        main(["doctor", str(build), "--cmake", str(cmake_binary), "--output-format", "json"]) == 1
+    )
     report = json.loads(capsys.readouterr().out)
     findings = {str(f["check"]): f for f in report["findings"]}
     assert findings["cmake"]["status"] == doctor.OK
@@ -95,7 +97,19 @@ def test_broken_cmake_is_a_finding_not_a_crash(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A cmake that cannot run shows up in the table with an action, exit code 1."""
-    assert main(["doctor", str(tmp_path), "--cmake", str(tmp_path / "no-cmake"), "--json"]) == 1
+    assert (
+        main(
+            [
+                "doctor",
+                str(tmp_path),
+                "--cmake",
+                str(tmp_path / "no-cmake"),
+                "--output-format",
+                "json",
+            ]
+        )
+        == 1
+    )
     findings = _findings(capsys.readouterr().out)
     assert findings["cmake"]["status"] == doctor.PROBLEM
     assert "cannot run" in str(findings["cmake"]["detail"])
@@ -116,7 +130,7 @@ def test_configured_tree_walks_from_problem_to_all_good(
     project.configure()
     build = str(project.build_dir)
 
-    assert main(["doctor", build, "--json"]) == 1
+    assert main(["doctor", build, "--output-format", "json"]) == 1
     findings = _findings(capsys.readouterr().out)
     assert findings["build tree"]["detail"] == "configured, Ninja"
     assert findings["generator"]["status"] == doctor.OK
@@ -125,7 +139,7 @@ def test_configured_tree_walks_from_problem_to_all_good(
 
     assert main(["enable", build]) == 0
     capsys.readouterr()
-    assert main(["doctor", build, "--json"]) == 1
+    assert main(["doctor", build, "--output-format", "json"]) == 1
     report = json.loads(capsys.readouterr().out)
     findings = {str(f["check"]): f for f in report["findings"]}
     assert findings["query"]["status"] == doctor.OK
@@ -134,7 +148,7 @@ def test_configured_tree_walks_from_problem_to_all_good(
     assert report["actions"] == [f"run cmake again in {build}"]
 
     project.configure()
-    assert main(["doctor", build, "--json"]) == 0
+    assert main(["doctor", build, "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     findings = {str(f["check"]): f for f in report["findings"]}
     assert report["needs_action"] is False
@@ -151,7 +165,19 @@ def test_query_without_callback_is_flagged(
     """Hooks without a callback make CMake index and delete the data unread; doctor says so."""
     project = make_project("chain", tmp_path, cmake_binary)
     project.write_query(InstrumentationQuery(hooks=("postCMakeBuild",)))
-    assert main(["doctor", str(project.build_dir), "--cmake", str(cmake_binary), "--json"]) == 1
+    assert (
+        main(
+            [
+                "doctor",
+                str(project.build_dir),
+                "--cmake",
+                str(cmake_binary),
+                "--output-format",
+                "json",
+            ]
+        )
+        == 1
+    )
     findings = _findings(capsys.readouterr().out)
     assert findings["query"]["status"] == doctor.PROBLEM
     assert "none names a callback" in str(findings["query"]["detail"])

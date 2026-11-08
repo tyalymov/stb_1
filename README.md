@@ -164,7 +164,7 @@ longpole runs prune --keep 20          # drop old runs
 longpole doctor build                  # is this tree recording, and if not, why
 longpole export --perfetto trace.json  # open the timeline in https://ui.perfetto.dev
 longpole export --markdown run.md      # a snapshot for a CI job summary
-longpole analyze --json                # everything above as JSON
+longpole analyze --output-format json  # everything above as JSON
 ```
 
 A run reference is an id or a prefix of one, `latest`, `latest~N`,

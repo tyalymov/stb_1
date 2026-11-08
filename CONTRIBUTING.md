@@ -113,7 +113,7 @@ The rules behind that shape:
   first paragraphs as the command's description. A command with actions of
   its own (`runs show`, `runs prune`) is a cyclopts `App` whose default
   function handles the bare command. Options several commands share, such
-  as `--store` and `--json`, are `Annotated` aliases in
+  as `--store` and `--output-format`, are `Annotated` aliases in
   `commands/options.py`, so their names and help text are written once and
   each command that takes one says so in its signature. There is no shared
   configuration object: a command gets everything it needs as parameters,

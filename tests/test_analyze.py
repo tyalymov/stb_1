@@ -63,11 +63,13 @@ def test_json_defaults_to_the_newest_run_and_accepts_references(
     newer = sample_run(run_id="20261031T120100Z-000002", created_at="2026-10-31T12:01:00+00:00")
     store = _store_with(tmp_path, older, newer)
 
-    assert main(["analyze", "--store", str(store), "--json"]) == 0
+    assert main(["analyze", "--store", str(store), "--output-format", "json"]) == 0
     assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120100Z-000002"
-    assert main(["analyze", "latest~1", "--store", str(store), "--json"]) == 0
+    assert main(["analyze", "latest~1", "--store", str(store), "--output-format", "json"]) == 0
     assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-000001"
-    assert main(["analyze", "20261031T120000Z", "--store", str(store), "--json"]) == 0
+    assert (
+        main(["analyze", "20261031T120000Z", "--store", str(store), "--output-format", "json"]) == 0
+    )
     report = json.loads(capsys.readouterr().out)
     assert report["summary"]["run_id"] == "20261031T120000Z-000001"
     assert report["summary"]["totals"]["step_count"] == 8
@@ -79,7 +81,7 @@ def test_json_defaults_to_the_newest_run_and_accepts_references(
 def test_top_limits_the_tables(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """--top caps every slowest-items table."""
     store = _store_with(tmp_path, sample_run())
-    assert main(["analyze", "--top", "1", "--store", str(store), "--json"]) == 0
+    assert main(["analyze", "--top", "1", "--store", str(store), "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert len(report["summary"]["slowest_targets"]) == 1
     assert len(report["summary"]["slowest_sources"]) == 1
@@ -106,7 +108,7 @@ def test_inside_a_build_tree_the_default_is_that_trees_newest_run(
     store = _store_with(tmp_path, mine, elsewhere)
 
     monkeypatch.chdir(tree / "CMakeFiles")
-    assert main(["analyze", "--store", str(store), "--json"]) == 0
+    assert main(["analyze", "--store", str(store), "--output-format", "json"]) == 0
     assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-000001"
 
 

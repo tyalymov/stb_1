@@ -9,13 +9,13 @@ store. A reference selects any other run: an id or prefix, ``latest``,
 
 from __future__ import annotations
 
-import json as json_module
+import json
 from pathlib import Path
 
 from longpole import output
 from longpole.analyzers.report import build_report, to_json
 from longpole.cmake import tooling
-from longpole.commands.options import Json, Store
+from longpole.commands.options import Output, Store
 from longpole.errors import UnknownRunError
 from longpole.exporters import terminal
 from longpole.model import Run
@@ -25,7 +25,12 @@ DEFAULT_TOP = 10
 
 
 def analyze(
-    run: str | None = None, /, *, top: int = DEFAULT_TOP, store: Store = None, json: Json = False
+    run: str | None = None,
+    /,
+    *,
+    top: int = DEFAULT_TOP,
+    store: Store = None,
+    output_format: Output = "text",
 ) -> int:
     """Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.
 
@@ -39,7 +44,7 @@ def analyze(
             or a dump path.
         top: Rows per table.
         store: Run store to read instead of the resolved one.
-        json: Print the report as JSON instead of tables.
+        output_format: text, or json for a program.
 
     Returns:
         0 on success.
@@ -51,8 +56,8 @@ def analyze(
     tree = tooling.find_build_tree(Path.cwd())
     runs = RunStore(resolve_store(store, build_dir=tree))
     report = build_report(load_run(runs, run, tree), top=top)
-    if json:
-        output.stdout(json_module.dumps(to_json(report), indent=2))
+    if output_format == "json":
+        output.stdout(json.dumps(to_json(report), indent=2))
     else:
         output.stdout(terminal.format_report(report))
     return 0
