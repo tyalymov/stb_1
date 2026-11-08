@@ -109,7 +109,7 @@ def test_filters_by_label_and_age(
     assert main(["--store", str(store.root), "--json", "runs", "--since", "1h"]) == 0
     listed = json.loads(capsys.readouterr().out)
     assert len(listed) == 1 and listed[0]["labels"] == ["ci:42"]
-    assert main(["--store", str(store.root), "runs", "--since", "yesterday"]) == 2
+    assert main(["--store", str(store.root), "runs", "--since", "yesterday"]) == 1
 
 
 def test_show_prints_the_manifest(
@@ -136,7 +136,7 @@ def test_prune_deletes_old_runs_and_needs_a_limit(
     """Pruning with --keep 1 removes the older run and names it; prune alone is a usage error."""
     monkeypatch.chdir(tmp_path)
     store = _store(tmp_path)
-    assert main(["--store", str(store), "runs", "prune"]) == 2
+    assert main(["--store", str(store), "runs", "prune"]) == 1
     assert "give --keep" in capsys.readouterr().err
     assert main(["--store", str(store), "runs", "prune", "--keep", "1"]) == 0
     assert capsys.readouterr().out.strip() == "20261031T120000Z-000001"

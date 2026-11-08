@@ -76,22 +76,12 @@ inside pytest by importing `main` and passing a list of arguments.
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
+    configure_logging("warning")  # the launcher reconfigures once --log-level is known
     try:
         return build_app().meta(args, exit_on_error=False, print_error=False)
-    except CycloptsError as exc:
-        output.stderr(f"error: {exc}")
-        return UsageError.exit_code
-    except UsageError as exc:
-        output.stderr(f"error: {exc}")
-        return exc.exit_code
-    except LongpoleError as exc:
-        log.error("%s", exc)
-        return exc.exit_code
-    except KeyboardInterrupt:
-        return EXIT_INTERRUPTED
-    except Exception:
-        log.exception("unexpected error")
-        return EXIT_UNEXPECTED
+    except Exception as exc:
+        log.error("%s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
+        return 1
 
 
 if __name__ == "__main__":
@@ -111,10 +101,9 @@ The rules behind that shape:
   app's *meta* app in `build_app`: it parses them, publishes the
   configuration and hands the remaining tokens to the inner app that holds
   the commands. Nothing exits the process: `exit_on_error=False` turns parse
-  errors into `CycloptsError`, which `main` reports as exit code 2 like any
-  `UsageError`; `result_action="return_int_as_exit_code_else_zero"` makes
-  `--help` and `--version` return 0 after printing. Otherwise `main` could
-  not be called from a test.
+  errors into exceptions, and `result_action="return_int_as_exit_code_else_zero"`
+  makes `--help` and `--version` return 0 after printing. Otherwise `main`
+  could not be called from a test.
 - `load_env` reads everything from the environment in one place:
   environment variables, XDG paths, tool versions.
 - `CliConfig` and `EnvConfig` are frozen dataclasses. They are published
@@ -135,9 +124,12 @@ The rules behind that shape:
   from `context.cli()` and `context.env()`, does the work and returns the
   exit code. `build_app` in `cli.py` registers the commands, in `--help`
   order.
-- Errors are a small hierarchy under `LongpoleError`, each with an
-  `exit_code`. Low-level exceptions are wrapped at the layer boundary with
-  a message a user can act on.
+- Errors are a small hierarchy under `LongpoleError`. Low-level exceptions
+  are wrapped at the layer boundary with a message a user can act on. `main`
+  does not tell them apart: every exception is one `ERROR:` line on stderr
+  and exit code 1, with the traceback added at `--log-level debug`. A
+  command that wants another code returns it, as `doctor` returns 1 when
+  something needs fixing.
 - The module docstring of an entry module is the `--help` output, verbatim.
   A test compares the two, with the help rendered at a fixed width so the
   text does not depend on the terminal; `scripts/sync-cli-help.py`

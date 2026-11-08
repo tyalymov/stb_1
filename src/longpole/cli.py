@@ -30,22 +30,16 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated
 
-from cyclopts import App, CycloptsError, Parameter
+from cyclopts import App, Parameter
 from rich.console import Console
 
-from longpole import __version__, context, output
+from longpole import __version__, context
 from longpole.cli_config import CliConfig, LogLevel
 from longpole.commands import analyze, capture, doctor, enable, export, runs
 from longpole.env_config import load_env
-from longpole.errors import LongpoleError, UsageError
+from longpole.errors import UsageError
 
 log = logging.getLogger(__name__)
-
-EXIT_UNEXPECTED = 70
-"""Exit code for an exception nothing expected; ``EX_SOFTWARE`` in ``sysexits.h``."""
-
-EXIT_INTERRUPTED = 130
-"""Exit code after Ctrl-C, the shell convention of 128 plus SIGINT."""
 
 LOGGER_NAME = "longpole"
 HANDLER_NAME = "longpole-stderr"
@@ -54,10 +48,10 @@ HANDLER_NAME = "longpole-stderr"
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code.
 
-    Builds the application, parses ``argv`` and runs the chosen command. The
-    process never ends with a traceback: expected failures are logged and
-    mapped to their exit codes, unexpected ones are logged with the stack and
-    return :data:`EXIT_UNEXPECTED`.
+    Builds the application, parses ``argv`` and runs the chosen command. Any
+    failure, a bad command line, an expected error or a bug alike, is logged
+    as one line and becomes exit code 1; ``--log-level debug`` adds the
+    stack. Ctrl-C is left to Python.
 
     Args:
         argv: Arguments without the program name. ``None`` means
@@ -65,27 +59,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             point, which calls ``main()`` bare. Tests pass a list.
 
     Returns:
-        0 on success and after ``--help`` or ``--version``; 2 on a usage
-        error; the command's own code on a known failure; 70 on an unexpected
-        exception; 130 after an interrupt.
+        0 on success and after ``--help`` or ``--version``; the command's
+        return value otherwise; 1 on any exception.
     """
     args = list(sys.argv[1:] if argv is None else argv)
+    configure_logging("warning")  # the launcher reconfigures once --log-level is known
     try:
         return build_app().meta(args, exit_on_error=False, print_error=False)
-    except CycloptsError as exc:
-        output.stderr(f"error: {exc}")
-        return UsageError.exit_code
-    except UsageError as exc:
-        output.stderr(f"error: {exc}")
-        return exc.exit_code
-    except LongpoleError as exc:
-        log.error("%s", exc)
-        return exc.exit_code
-    except KeyboardInterrupt:
-        return EXIT_INTERRUPTED
-    except Exception:
-        log.exception("unexpected error")
-        return EXIT_UNEXPECTED
+    except Exception as exc:
+        log.error("%s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
+        return 1
 
 
 def build_app() -> App:
@@ -95,7 +78,8 @@ def build_app() -> App:
     app, whose only job is to parse them, publish the configuration through
     :mod:`longpole.context` and hand the remaining tokens to the inner app.
     That is how ``longpole --json analyze`` gets its flag before the command
-    word, the way git does it.
+    word, the way git does it. Nothing here exits the process or prints
+    errors; ``main`` does both, so it can be called from a test.
 
     Returns:
         The application; call its ``meta`` with the arguments.

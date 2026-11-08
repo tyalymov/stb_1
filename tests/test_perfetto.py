@@ -131,7 +131,7 @@ def test_export_writes_a_file_or_stdout(tmp_path: Path, capsys: pytest.CaptureFi
     assert main(["--store", str(store.root), "export", "--perfetto", "-"]) == 0
     assert json.loads(capsys.readouterr().out)["otherData"]["hook"] == "postCMakeBuild"
 
-    assert main(["--store", str(store.root), "export", "latest"]) == 2
+    assert main(["--store", str(store.root), "export", "latest"]) == 1
     assert "choose at least one format" in capsys.readouterr().err
 
 

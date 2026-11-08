@@ -85,18 +85,18 @@ def test_version_prints_the_package_version(capsys: pytest.CaptureFixture[str]) 
 
 
 def test_missing_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
-    """No command means an error on stderr, nothing on stdout, exit code 2."""
-    assert main([]) == 2
+    """No command means an error on stderr, nothing on stdout, exit code 1."""
+    assert main([]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert captured.err == "error: no command given; see --help\n"
+    assert captured.err == "ERROR: no command given; see --help\n"
 
 
 def test_unknown_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
     """A word that is not a command is reported with the list of commands."""
-    assert main(["frobnicate"]) == 2
+    assert main(["frobnicate"]) == 1
     err = capsys.readouterr().err
-    assert err.startswith('error: Unknown command "frobnicate"')
+    assert err.startswith('ERROR: Unknown command "frobnicate"')
     assert "enable, capture, doctor, analyze, export, runs" in err
 
 
@@ -105,13 +105,13 @@ def test_unknown_option_is_a_usage_error(
 ) -> None:
     """An option the command does not know is reported, not swallowed."""
     _with_command(monkeypatch, echo)
-    assert main(["echo", "hi", "--frobnicate"]) == 2
+    assert main(["echo", "hi", "--frobnicate"]) == 1
     assert "--frobnicate" in capsys.readouterr().err
 
 
 def test_bad_log_level_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
     """`--log-level` accepts only the four known names."""
-    assert main(["--log-level", "loud", "analyze"]) == 2
+    assert main(["--log-level", "loud", "analyze"]) == 1
     err = capsys.readouterr().err
     assert "--log-level" in err
     assert "loud" in err
@@ -148,7 +148,7 @@ def test_missing_argument_is_a_usage_error(
 ) -> None:
     """A required positional left out is a usage error naming it."""
     _with_command(monkeypatch, echo)
-    assert main(["echo"]) == 2
+    assert main(["echo"]) == 1
     assert "WORD" in capsys.readouterr().err
 
 
@@ -162,36 +162,35 @@ def test_context_is_cleared_after_main(monkeypatch: pytest.MonkeyPatch) -> None:
         context.env()
 
 
-def test_known_failure_maps_to_its_exit_code(
+def test_failure_is_logged_once_and_exits_1(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A LongpoleError is logged once on stderr and becomes the error's exit code."""
-
-    class DiskError(LongpoleError):
-        exit_code = 3
+    """An expected error is one line on stderr, nothing on stdout, exit code 1."""
 
     def fail() -> int:
-        raise DiskError("the disk is on fire")
+        raise LongpoleError("the disk is on fire")
 
     _with_command(monkeypatch, fail)
-    assert main(["fail"]) == 3
+    assert main(["fail"]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == "ERROR: the disk is on fire\n"
 
 
-def test_unexpected_exception_is_logged_with_the_stack(
+def test_unexpected_exception_shows_the_stack_only_at_debug(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Anything else returns 70 and leaves a traceback on stderr for the bug report."""
+    """A bug is the same one line by default; --log-level debug adds the traceback."""
 
     def explode() -> int:
         raise ZeroDivisionError("boom")
 
     _with_command(monkeypatch, explode)
-    assert main(["explode"]) == 70
+    assert main(["explode"]) == 1
+    assert capsys.readouterr().err == "ERROR: boom\n"
+    assert main(["--log-level", "debug", "explode"]) == 1
     err = capsys.readouterr().err
-    assert "unexpected error" in err
+    assert err.startswith("ERROR: boom\n")
     assert "ZeroDivisionError: boom" in err
 
 

@@ -1,36 +1,20 @@
 """Exceptions longpole raises on purpose.
 
-Every error a user can hit derives from :class:`LongpoleError` and carries the
-exit code ``main`` should return for it, so the command layer can map failures
-to exit codes without a table of its own. Programming errors stay ordinary
-Python exceptions.
+Every error a user can hit derives from :class:`LongpoleError`, with a message
+that says what happened and what to do about it. ``main`` logs the message and
+exits with 1, whatever the class; the classes exist so callers can catch one
+kind of failure and let the rest through.
 """
 
 from __future__ import annotations
 
 
 class LongpoleError(Exception):
-    """Base of every expected failure.
-
-    Attributes:
-        exit_code: Process exit code that represents this failure; 1 unless a
-            subclass says otherwise.
-    """
-
-    exit_code: int = 1
+    """Base of every expected failure."""
 
 
 class UsageError(LongpoleError):
-    """The command line could not be parsed.
-
-    The message is argparse's usage text plus the complaint, ready to print
-    to standard error as is.
-
-    Attributes:
-        exit_code: 2, the convention for misuse of a command-line program.
-    """
-
-    exit_code = 2
+    """The arguments parsed but do not make sense together, e.g. ``runs prune`` without a limit."""
 
 
 class SchemaError(LongpoleError):
