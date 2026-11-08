@@ -80,15 +80,15 @@ def test_paths_with_spaces_are_quoted(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.cmake
 def test_enable_writes_query_graph_request_and_store_marker(
-    tmp_path: Path, cmake_binary: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, cmake_on_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Enabling a tree leaves exactly the files CMake and longpole need, with the right minor."""
     build = tmp_path / "build"
-    assert main(["enable", str(build), "--cmake", str(cmake_binary)]) == 0
+    assert main(["enable", str(build)]) == 0
 
     query = build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
     document = json.loads(query.read_text(encoding="utf-8"))
-    expected_minor = tooling.data_version_for_line(cmake_version_of(cmake_binary))
+    expected_minor = tooling.data_version_for_line(cmake_version_of(cmake_on_path))
     assert expected_minor is not None
     assert document["version"] == {"major": 1, "minor": expected_minor.minor}
     assert document["hooks"] == list(enable.HOOKS)
@@ -103,17 +103,15 @@ def test_enable_writes_query_graph_request_and_store_marker(
 
 @pytest.mark.cmake
 def test_enable_is_idempotent_and_json_reports_the_same_paths(
-    tmp_path: Path, cmake_binary: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, cmake_on_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A second enable rewrites identical content; --json carries the paths as strings."""
     build = tmp_path / "build"
-    assert main(["enable", str(build), "--cmake", str(cmake_binary)]) == 0
+    assert main(["enable", str(build)]) == 0
     first = (build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json").read_bytes()
     capsys.readouterr()
 
-    assert (
-        main(["enable", str(build), "--cmake", str(cmake_binary), "--output-format", "json"]) == 0
-    )
+    assert main(["enable", str(build), "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert Path(report["query"]).read_bytes() == first
     assert report["scope"] == "tree"
@@ -124,31 +122,31 @@ def test_enable_is_idempotent_and_json_reports_the_same_paths(
 
 @pytest.mark.cmake
 def test_remove_deletes_the_queries_but_keeps_the_store(
-    tmp_path: Path, cmake_binary: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, cmake_on_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """--remove undoes enable except for the store, which may already hold runs."""
     build = tmp_path / "build"
-    assert main(["enable", str(build), "--cmake", str(cmake_binary)]) == 0
-    assert main(["enable", str(build), "--cmake", str(cmake_binary), "--remove"]) == 0
+    assert main(["enable", str(build)]) == 0
+    assert main(["enable", str(build), "--remove"]) == 0
     query = build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
     assert not query.exists()
     assert not fileapi.query_path(build).exists()
     assert (build / IN_TREE).is_dir()
     assert capsys.readouterr().out.splitlines()[-1] == f"removed {query}"
 
-    assert main(["enable", str(build), "--cmake", str(cmake_binary), "--remove"]) == 0
+    assert main(["enable", str(build), "--remove"]) == 0
 
 
 @pytest.mark.cmake
 def test_global_writes_to_cmake_config_dir(
     tmp_path: Path,
-    cmake_binary: Path,
+    cmake_on_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """--global writes where `cmake --print-config-dir` points, which honours CMAKE_CONFIG_DIR."""
     monkeypatch.setenv("CMAKE_CONFIG_DIR", str(tmp_path / "config"))
-    assert main(["enable", "--global", "--cmake", str(cmake_binary)]) == 0
+    assert main(["enable", "--global"]) == 0
     query = tmp_path / "config" / "instrumentation" / "v1" / "query" / "longpole.json"
     assert query.is_file()
     assert capsys.readouterr().out.startswith(f"enabled (global): {query}")
@@ -158,47 +156,61 @@ def test_global_writes_to_cmake_config_dir(
 @pytest.mark.cmake
 @pytest.mark.slow
 def test_configured_tree_gets_the_regenerate_hint(
-    tmp_path: Path, cmake_binary: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, cmake_on_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Enabling after configure works only after another cmake run, and the command says so.
-
-    Without --cmake the command consults the cmake recorded in the tree's cache.
-    """
-    project = make_project("chain", tmp_path, cmake_binary)
+    """Enabling after configure works only after another cmake run, and the command says so."""
+    project = make_project("chain", tmp_path, cmake_on_path)
     project.configure()
     assert main(["enable", str(project.build_dir), "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["regenerate_needed"] is True
     assert report["cmake_version"].startswith(
-        ".".join(map(str, cmake_version_of(cmake_binary)[:2]))
+        ".".join(map(str, cmake_version_of(cmake_on_path)[:2]))
     )
 
     assert main(["enable", str(project.build_dir)]) == 0
     assert "run cmake again" in capsys.readouterr().out
 
 
-def test_missing_cmake_is_reported(
+def test_missing_cmake_is_a_warning_not_a_refusal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """No --cmake, no cache, nothing on PATH: a clear message and exit code 1."""
+    """Nothing on PATH: the query is still written, for data version 1.0, with a warning."""
     monkeypatch.setattr(shutil, "which", _which(None))
-    assert main(["enable", str(tmp_path / "build")]) == 1
-    assert "no cmake executable found on PATH; pass --cmake" in capsys.readouterr().err
+    build = tmp_path / "build"
+    assert main(["enable", str(build)]) == 0
+    captured = capsys.readouterr()
+    assert "WARNING: no cmake on PATH" in captured.err
+    assert "data version: 1.0 (cmake not found)" in captured.out
+    document = json.loads(
+        (build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json").read_text()
+    )
+    assert document["version"] == {"major": 1, "minor": 0}
+    assert "processMetrics" not in document["options"]
 
 
-def test_old_cmake_is_refused(
+def test_old_cmake_is_a_warning_not_a_refusal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A CMake older than 4.3 has no instrumentation API; the command refuses to write a query."""
+    """A CMake older than 4.3 records nothing; the query is written anyway and the user is told."""
 
     def describe(cmake: Path, *, timeout: float = 30.0) -> tooling.CMakeInfo:
         return tooling.CMakeInfo(
             executable=cmake, version="3.31.9", version_tuple=(3, 31, 9), data_version=None
         )
 
+    monkeypatch.setattr(shutil, "which", _which("/fake/cmake"))
     monkeypatch.setattr(tooling, "describe", describe)
-    assert main(["enable", str(tmp_path / "build"), "--cmake", "/fake/cmake"]) == 1
-    err = capsys.readouterr().err
-    assert "CMake 3.31.9" in err
-    assert "4.3 or newer" in err
-    assert not (tmp_path / "build").exists()
+    assert main(["enable", str(tmp_path / "build")]) == 0
+    captured = capsys.readouterr()
+    assert "WARNING: cmake on PATH is 3.31.9, older than 4.3" in captured.err
+    assert "data version: 1.0 (cmake 3.31.9)" in captured.out
+
+
+def test_global_without_cmake_is_an_error(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--global needs cmake to say where the user-level directory is; without it, exit code 1."""
+    monkeypatch.setattr(shutil, "which", _which(None))
+    assert main(["enable", "--global"]) == 1
+    assert "no cmake on PATH" in capsys.readouterr().err

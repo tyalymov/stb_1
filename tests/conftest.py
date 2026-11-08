@@ -83,6 +83,21 @@ def cmake_binary() -> Path:
     return cmake
 
 
+@pytest.fixture
+def cmake_on_path(cmake_binary: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Put the session's CMake first on PATH, where `enable` looks for it.
+
+    Args:
+        cmake_binary: The session's CMake.
+        monkeypatch: pytest's monkeypatch fixture.
+
+    Returns:
+        The same executable.
+    """
+    monkeypatch.setenv("PATH", f"{cmake_binary.parent}{os.pathsep}{os.environ.get('PATH', '')}")
+    return cmake_binary
+
+
 @pytest.fixture(scope="session")
 def cmake_version(cmake_binary: Path) -> tuple[int, int, int]:
     """Version of :func:`cmake_binary` as a comparable tuple.

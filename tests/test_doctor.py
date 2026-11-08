@@ -80,13 +80,13 @@ def test_unconfigured_tree_without_query_needs_enable(
 
 @pytest.mark.cmake
 def test_enabled_but_unconfigured_tree_is_fine(
-    tmp_path: Path, cmake_binary: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, cmake_on_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """After enable an unconfigured tree needs nothing; the query applies at the first configure."""
     build = tmp_path / "build"
-    assert main(["enable", str(build), "--cmake", str(cmake_binary)]) == 0
+    assert main(["enable", str(build)]) == 0
     capsys.readouterr()
-    assert main(["doctor", str(build), "--cmake", str(cmake_binary)]) == 0
+    assert main(["doctor", str(build), "--cmake", str(cmake_on_path)]) == 0
     out = capsys.readouterr().out
     assert "all good" in out
     assert "not configured yet" in out
