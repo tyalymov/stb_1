@@ -31,7 +31,6 @@ from rich.console import Console
 
 from longpole import __version__
 from longpole.commands import analyze, capture, doctor, enable, export, runs
-from longpole.errors import UsageError
 
 log = logging.getLogger(__name__)
 
@@ -76,13 +75,8 @@ def launcher(
         log_level: How much to say on stderr: debug, info, warning (the default) or error.
 
     Returns:
-        The command's exit code.
-
-    Raises:
-        UsageError: No command was given.
+        The command's exit code; 0 after the help the bare program prints.
     """
-    if not tokens:
-        raise UsageError("no command given; see --help")
     logging.getLogger("longpole").setLevel(log_level.upper())
     return app(tokens, exit_on_error=False, print_error=False)
 

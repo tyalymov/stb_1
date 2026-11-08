@@ -81,12 +81,12 @@ def test_version_prints_the_package_version(capsys: pytest.CaptureFixture[str]) 
     assert capsys.readouterr().out == f"longpole {__version__}\n"
 
 
-def test_missing_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
-    """No command means an error on stderr, nothing on stdout, exit code 1."""
-    assert main([]) == 1
+def test_bare_program_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
+    """No command means the help on stdout and exit code 0, like `--help`."""
+    assert main([]) == 0
     captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == "ERROR: no command given; see --help\n"
+    assert _lines(captured.out) == _lines(cli.__doc__ or "")
+    assert captured.err == ""
 
 
 def test_unknown_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
