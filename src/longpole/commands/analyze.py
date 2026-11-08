@@ -9,7 +9,6 @@ store. A reference selects any other run: an id or prefix, ``latest``,
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from longpole import output
@@ -56,10 +55,7 @@ def analyze(
     tree = tooling.find_build_tree(Path.cwd())
     runs = RunStore(resolve_store(store, build_dir=tree))
     report = build_report(load_run(runs, run, tree), top=top)
-    if output_format == "json":
-        output.stdout(json.dumps(to_json(report), indent=2))
-    else:
-        output.stdout(terminal.format_report(report))
+    output.result(report, output_format, text=terminal.format_report, data=to_json)
     return 0
 
 

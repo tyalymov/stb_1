@@ -11,7 +11,6 @@ also works as a gate in a script.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import shutil
@@ -102,10 +101,7 @@ def doctor(
         0 when no finding asks for an action, 1 otherwise.
     """
     report = examine(build_dir, cmake_override=cmake, store_override=store, environ=os.environ)
-    if output_format == "json":
-        output.stdout(json.dumps(_as_json(report), indent=2))
-    else:
-        output.stdout(describe(report))
+    output.result(report, output_format, text=describe, data=_as_json)
     return 1 if report.actions else 0
 
 

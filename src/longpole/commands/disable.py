@@ -7,7 +7,6 @@ the captured runs, which stay readable.
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -58,8 +57,7 @@ def disable(
         fileapi.query_path(build_dir).unlink(missing_ok=True)
     log.info("removed %s", query)
     scope = "global" if build_dir is None else "tree"
-    if output_format == "json":
-        output.stdout(json.dumps({"scope": scope, "query": str(query)}, indent=2))
-    else:
-        output.stdout(f"removed {query}")
+    output.result(
+        {"scope": scope, "query": query}, output_format, text=lambda _: f"removed {query}"
+    )
     return 0

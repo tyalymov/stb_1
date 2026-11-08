@@ -21,7 +21,7 @@ import json
 import logging
 import shutil
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
@@ -92,10 +92,7 @@ def enable(
     if (build_dir is None) == (not everywhere):
         raise UsageError("enable: give a build tree or --global, not both and not neither")
     result = write_query(build_dir)
-    if output_format == "json":
-        output.stdout(json.dumps(_as_json(result), indent=2))
-    else:
-        output.stdout(_describe(result))
+    output.result(result, output_format, text=_describe)
     return 0
 
 
@@ -265,22 +262,6 @@ def _quoted(path: str) -> str:
         The path, quoted when needed.
     """
     return f'"{path}"' if any(character.isspace() for character in path) else path
-
-
-def _as_json(result: EnableResult) -> dict[str, object]:
-    """Serialise a result with paths as strings.
-
-    Args:
-        result: The result.
-
-    Returns:
-        A JSON-ready object.
-    """
-    document = asdict(result)
-    for key in ("query", "file_api_query"):
-        if document[key] is not None:
-            document[key] = str(document[key])
-    return document
 
 
 def _describe(result: EnableResult) -> str:

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 from cyclopts import Parameter
+
+from longpole.output import OutputFormat
 
 Store = Annotated[
     Path | None,
@@ -15,9 +17,6 @@ Store = Annotated[
     ),
 ]
 """``--store PATH``; ``None`` leaves the choice to :func:`longpole.store.resolve_store`."""
-
-OutputFormat = Literal["text", "json"]
-"""What a command prints: ``text`` for people, ``json`` for other programs."""
 
 Output = Annotated[
     OutputFormat,

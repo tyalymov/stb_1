@@ -8,7 +8,6 @@ run's manifest, ``prune`` deletes old runs by count or by age.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from dataclasses import asdict
@@ -23,7 +22,8 @@ from longpole.cmake import tooling
 from longpole.commands.options import Output, Store
 from longpole.errors import UsageError
 from longpole.exporters import terminal
-from longpole.model import Manifest
+from longpole.model import Manifest, Run
+from longpole.output import OutputFormat
 from longpole.store import RunStore, RunSummary, resolve_store
 
 log = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def list_runs(
         build_dir=build_dir,
         since=since,
         label=label,
-        json_output=output_format == "json",
+        output_format=output_format,
     )
 
 
@@ -128,7 +128,7 @@ def show(run: str = "latest", /, *, store: Store = None, output_format: Output =
         DumpFormatError: The run on disk is malformed.
     """
     runs = _store(store, tooling.find_build_tree(Path.cwd()))
-    return _show(runs, run, json_output=output_format == "json")
+    return _show(runs, run, output_format=output_format)
 
 
 @app.command
@@ -156,7 +156,7 @@ def prune(
     if keep is None and older_than is None:
         raise UsageError("runs prune: give --keep N, --older-than AGE, or both")
     runs = _store(store, tooling.find_build_tree(Path.cwd()))
-    return _prune(runs, keep=keep, older_than=older_than, json_output=output_format == "json")
+    return _prune(runs, keep=keep, older_than=older_than, output_format=output_format)
 
 
 def _store(explicit: Path | None, tree: Path | None) -> RunStore:
@@ -178,7 +178,7 @@ def _list(
     build_dir: Path | None,
     since: timedelta | None,
     label: str | None,
-    json_output: bool,
+    output_format: OutputFormat,
 ) -> int:
     """Print the catalogue.
 
@@ -187,21 +187,21 @@ def _list(
         build_dir: Only runs of this tree, or ``None`` for every tree.
         since: Only runs captured within this long ago, or ``None``.
         label: Only runs carrying this label, or ``None``.
-        json_output: JSON instead of a table.
+        output_format: Aligned lines, or JSON.
 
     Returns:
         0.
     """
     cutoff = datetime.now(UTC) - since if since is not None else None
     summaries = store.list(build_dir=build_dir, label=label, since=cutoff)
-    if json_output:
-        output.stdout(json.dumps([asdict(summary) for summary in summaries], indent=2))
-        return 0
-    if not summaries:
-        scope = f" from {build_dir}" if build_dir is not None else ""
-        output.stdout(f"no runs{scope} in {store.root}")
-        return 0
-    output.stdout(_catalogue(summaries, build_dir is not None))
+
+    def text(found: list[RunSummary]) -> str:
+        if not found:
+            scope = f" from {build_dir}" if build_dir is not None else ""
+            return f"no runs{scope} in {store.root}"
+        return _catalogue(found, build_dir is not None)
+
+    output.result(summaries, output_format, text=text)
     return 0
 
 
@@ -255,13 +255,13 @@ def _when(created_at: str) -> str:
     return moment.astimezone(UTC).strftime("%Y-%m-%d %H:%M")
 
 
-def _show(store: RunStore, ref: str, *, json_output: bool) -> int:
+def _show(store: RunStore, ref: str, *, output_format: OutputFormat) -> int:
     """Print one run's manifest.
 
     Args:
         store: The store.
         ref: Run reference.
-        json_output: JSON instead of a key/value table.
+        output_format: A key/value table, or JSON.
 
     Returns:
         0.
@@ -271,13 +271,35 @@ def _show(store: RunStore, ref: str, *, json_output: bool) -> int:
         DumpFormatError: The run on disk is malformed.
     """
     loaded = store.read(ref)
+    output.result(loaded, output_format, text=_manifest_table, data=_manifest_document)
+    return 0
+
+
+def _manifest_document(loaded: Run) -> dict[str, object]:
+    """The manifest plus two counts, for JSON.
+
+    Args:
+        loaded: The run.
+
+    Returns:
+        A JSON-ready object.
+    """
+    document: dict[str, object] = asdict(loaded.manifest)
+    document["steps"] = len(loaded.steps)
+    document["has_graph"] = loaded.graph is not None
+    return document
+
+
+def _manifest_table(loaded: Run) -> str:
+    """The manifest as a key/value table.
+
+    Args:
+        loaded: The run.
+
+    Returns:
+        The text.
+    """
     manifest = loaded.manifest
-    if json_output:
-        document = asdict(manifest)
-        document["steps"] = len(loaded.steps)
-        document["has_graph"] = loaded.graph is not None
-        output.stdout(json.dumps(document, indent=2))
-        return 0
     environment = manifest.environment
     rows = [
         ("run", manifest.run_id),
@@ -294,8 +316,7 @@ def _show(store: RunStore, ref: str, *, json_output: bool) -> int:
         ("graph", "yes" if loaded.graph is not None else "no"),
         ("longpole", manifest.tool_version),
     ]
-    output.stdout(terminal.render(terminal.table(None, ("", ""), rows, show_header=False)))
-    return 0
+    return terminal.render(terminal.table(None, ("", ""), rows, show_header=False))
 
 
 def _git_line(manifest: Manifest) -> str:
@@ -319,7 +340,7 @@ def _git_line(manifest: Manifest) -> str:
 
 
 def _prune(
-    store: RunStore, *, keep: int | None, older_than: timedelta | None, json_output: bool
+    store: RunStore, *, keep: int | None, older_than: timedelta | None, output_format: OutputFormat
 ) -> int:
     """Delete runs and say which.
 
@@ -327,15 +348,12 @@ def _prune(
         store: The store.
         keep: How many newest runs survive, or ``None``.
         older_than: Runs older than this go, or ``None``.
-        json_output: JSON list instead of one id per line.
+        output_format: One id per line, or a JSON list.
 
     Returns:
         0.
     """
     deleted = store.prune(keep=keep, older_than=older_than)
-    if json_output:
-        output.stdout(json.dumps(deleted))
-    elif deleted:
-        output.stdout("\n".join(deleted))
+    output.result(deleted, output_format, text="\n".join)
     log.info("deleted %d run(s) from %s", len(deleted), store.root)
     return 0
