@@ -71,8 +71,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        result = build_app().meta(args, exit_on_error=False, print_error=False)
-        return 0 if result is None else int(result)
+        return build_app().meta(args, exit_on_error=False, print_error=False)
     except CycloptsError as exc:
         output.stderr(f"error: {exc}")
         return UsageError.exit_code
@@ -113,7 +112,7 @@ def build_app() -> App:
         # Fixed width, so the help text does not depend on the terminal it is printed to.
         console=Console(width=100),
         help_format="plaintext",
-        result_action="return_value",
+        result_action="return_int_as_exit_code_else_zero",
         default_parameter=Parameter(negative="", show_default=False, show_choices=False),
     )
     commands = (
@@ -157,8 +156,7 @@ def build_app() -> App:
         configure_logging(log_level)
         cli = CliConfig(log_level=log_level, store=store, json_output=json)
         with context.activate(cli, load_env()):
-            result = app(tokens, exit_on_error=False, print_error=False)
-        return 0 if result is None else int(result)
+            return app(tokens, exit_on_error=False, print_error=False)
 
     return app
 

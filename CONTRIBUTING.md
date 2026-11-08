@@ -77,8 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        result = build_app(COMMANDS).meta(args, exit_on_error=False, print_error=False)
-        return 0 if result is None else int(result)
+        return build_app().meta(args, exit_on_error=False, print_error=False)
     except CycloptsError as exc:
         output.stderr(f"error: {exc}")
         return UsageError.exit_code
@@ -113,8 +112,9 @@ The rules behind that shape:
   configuration and hands the remaining tokens to the inner app that holds
   the commands. Nothing exits the process: `exit_on_error=False` turns parse
   errors into `CycloptsError`, which `main` reports as exit code 2 like any
-  `UsageError`; `--help` and `--version` print and return `None`. Otherwise
-  `main` could not be called from a test.
+  `UsageError`; `result_action="return_int_as_exit_code_else_zero"` makes
+  `--help` and `--version` return 0 after printing. Otherwise `main` could
+  not be called from a test.
 - `load_env` reads everything from the environment in one place:
   environment variables, XDG paths, tool versions.
 - `CliConfig` and `EnvConfig` are frozen dataclasses. They are published
