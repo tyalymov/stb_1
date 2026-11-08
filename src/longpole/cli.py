@@ -23,7 +23,6 @@ as a run, and shows what actually gated it.
 
 from __future__ import annotations
 
-import io
 import logging
 import sys
 from collections.abc import Sequence
@@ -124,22 +123,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as exc:
         log.error("%s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
         return 1
-
-
-def help_text() -> str:
-    """Render ``longpole --help`` as a string.
-
-    The module docstring of this file is kept equal to it by
-    ``scripts/sync-cli-help.py`` and a test.
-
-    Returns:
-        The help text, wrapped at the app's width, without the trailing
-        spaces rich pads lines with.
-    """
-    buffer = io.StringIO()
-    app.meta(["--help"], console=Console(file=buffer, width=app.console.width))
-    padded = buffer.getvalue().splitlines()
-    return "".join(line.rstrip() + "\n" for line in padded)
 
 
 def configure_logging(level: str) -> None:

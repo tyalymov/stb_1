@@ -9,10 +9,13 @@ string, then review the diff:
 
 from __future__ import annotations
 
+import io
 import sys
 from pathlib import Path
 
-from longpole.cli import help_text
+from rich.console import Console
+
+from longpole import cli
 
 CLI_MODULE = Path(__file__).resolve().parents[1] / "src" / "longpole" / "cli.py"
 
@@ -33,6 +36,17 @@ def main() -> int:
     if updated != text:
         CLI_MODULE.write_text(updated, encoding="utf-8")
     return 0
+
+
+def help_text() -> str:
+    """Render ``longpole --help`` at the app's width, without the trailing spaces rich pads with.
+
+    Returns:
+        The help text.
+    """
+    buffer = io.StringIO()
+    cli.app.meta(["--help"], console=Console(file=buffer, width=cli.app.console.width))
+    return "".join(line.rstrip() + "\n" for line in buffer.getvalue().splitlines())
 
 
 if __name__ == "__main__":

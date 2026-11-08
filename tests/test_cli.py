@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from longpole import __version__, cli, context, output
-from longpole.cli import help_text, main
+from longpole.cli import main
 from longpole.errors import LongpoleError
 
 
@@ -59,13 +59,8 @@ def _lines(text: str) -> list[str]:
     return [line.rstrip() for line in text.splitlines()]
 
 
-def test_module_docstring_is_the_help_text() -> None:
-    """The entry module's docstring and `longpole --help` are the same text."""
-    assert _lines(cli.__doc__ or "") == _lines(help_text())
-
-
 def test_help_prints_and_returns_zero(capsys: pytest.CaptureFixture[str]) -> None:
-    """`--help` goes to stdout and ends with exit code 0 instead of a SystemExit."""
+    """`--help` goes to stdout, ends with exit code 0, and is the module docstring of cli.py."""
     assert main(["--help"]) == 0
     captured = capsys.readouterr()
     assert _lines(captured.out) == _lines(cli.__doc__ or "")
