@@ -36,29 +36,6 @@ from longpole.store import IN_TREE
 
 log = logging.getLogger(__name__)
 
-QUERY_FILE_NAME = "longpole.json"
-"""Name of our query file in either query directory."""
-
-HOOKS: tuple[str, ...] = (
-    "postGenerate",
-    "postCMakeBuild",
-    "postCMakeInstall",
-    "postCMakeWorkflow",
-    "postCTest",
-)
-"""Every hook CMake offers for work done through ``cmake`` and ``ctest`` themselves.
-
-``preBuild`` and ``postBuild`` fire when the generator's tool (``ninja``,
-``make``) is run directly; longpole treats the generator as an
-implementation detail of CMake and leaves them out.
-"""
-
-BASE_OPTIONS: tuple[str, ...] = ("staticSystemInformation", "dynamicSystemInformation")
-"""Options every supported CMake accepts."""
-
-PROCESS_METRICS_MINOR = 2
-"""Data minor from which ``processMetrics`` exists; older CMakes ignore a query that asks for it."""
-
 
 @dataclass(frozen=True, kw_only=True)
 class EnableResult:
@@ -263,7 +240,7 @@ def query_location(build_dir: Path | None) -> Path:
                 "no cmake on PATH to ask for the user-level configuration directory"
             )
         root = tooling.config_dir(Path(found))
-    return root / "instrumentation" / "v1" / "query" / QUERY_FILE_NAME
+    return root / "instrumentation" / "v1" / "query" / "longpole.json"
 
 
 def query_document(data_version: DataVersion, callback: str) -> dict[str, object]:
@@ -280,12 +257,21 @@ def query_document(data_version: DataVersion, callback: str) -> dict[str, object
     Returns:
         A JSON-ready object with ``version``, ``hooks``, ``callbacks`` and ``options``.
     """
-    options = list(BASE_OPTIONS)
-    if data_version.minor >= PROCESS_METRICS_MINOR:
+    options = ["staticSystemInformation", "dynamicSystemInformation"]
+    if data_version.minor >= 2:  # processMetrics exists from data 1.2 (CMake 4.5)
         options.append("processMetrics")
     return {
         "version": {"major": data_version.major, "minor": data_version.minor},
-        "hooks": list(HOOKS),
+        # Every hook for work done through cmake and ctest themselves. preBuild and
+        # postBuild fire when ninja or make is run directly; the generator is CMake's
+        # implementation detail here, so they are left out.
+        "hooks": [
+            "postGenerate",
+            "postCMakeBuild",
+            "postCMakeInstall",
+            "postCMakeWorkflow",
+            "postCTest",
+        ],
         "callbacks": [callback],
         "options": options,
     }

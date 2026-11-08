@@ -17,6 +17,15 @@ from longpole.model import DataVersion
 from longpole.store import IN_TREE
 from tests.conftest import cmake_version_of, make_project
 
+CAPTURE_HOOKS = [
+    "postGenerate",
+    "postCMakeBuild",
+    "postCMakeInstall",
+    "postCMakeWorkflow",
+    "postCTest",
+]
+"""The hooks `enable` asks for."""
+
 
 def _which(found: str | None) -> Callable[[str], str | None]:
     """A stand-in for ``shutil.which`` that answers the same path for every name.
@@ -45,19 +54,9 @@ def test_query_asks_for_process_metrics_only_from_data_1_2() -> None:
         "dynamicSystemInformation",
         "processMetrics",
     ]
-    assert old["hooks"] == new["hooks"] == list(enable.HOOKS)
     assert old["callbacks"] == ["longpole capture"]
-
-
-def test_hooks_cover_cmake_and_ctest_but_not_the_build_tool() -> None:
-    """Every post-hook of cmake and ctest is requested; the generator's own hooks are not."""
-    assert set(enable.HOOKS) == {
-        "postGenerate",
-        "postCMakeBuild",
-        "postCMakeInstall",
-        "postCMakeWorkflow",
-        "postCTest",
-    }
+    # every post-hook of cmake and ctest; not the generator's own preBuild/postBuild
+    assert old["hooks"] == new["hooks"] == CAPTURE_HOOKS
 
 
 def test_callback_prefers_the_installed_script(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -91,7 +90,7 @@ def test_enable_writes_query_graph_request_and_store_marker(
     expected_minor = tooling.data_version_for_line(cmake_version_of(cmake_on_path))
     assert expected_minor is not None
     assert document["version"] == {"major": 1, "minor": expected_minor.minor}
-    assert document["hooks"] == list(enable.HOOKS)
+    assert document["hooks"] == CAPTURE_HOOKS
     assert document["callbacks"] == [enable.callback_command()]
     assert fileapi.query_path(build).is_file()
     assert (build / IN_TREE).is_dir()

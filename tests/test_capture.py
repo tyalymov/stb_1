@@ -131,9 +131,7 @@ def capture_hooks() -> tuple[str, ...]:
     Returns:
         The hook names.
     """
-    from longpole.commands.enable import HOOKS
-
-    return HOOKS
+    return ("postGenerate", "postCMakeBuild", "postCMakeInstall", "postCMakeWorkflow", "postCTest")
 
 
 @pytest.mark.cmake
