@@ -117,17 +117,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         return value otherwise; 1 on any exception.
     """
     args = list(sys.argv[1:] if argv is None else argv)
-    # Our own handler on the package logger: the one Python falls back to prints bare
-    # text and nothing below WARNING. Rebuilt on every call because pytest swaps
-    # sys.stderr per test and a handler keeps the stream it was created with.
-    logger = logging.getLogger("longpole")
-    logger.handlers.clear()
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.WARNING)  # the launcher applies --log-level
+    init_logging()
     try:
         return app.meta(args, exit_on_error=False, print_error=False)
     except Exception as exc:
         log.error("%s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
         return 1
+
+
+def init_logging() -> None:
+    """Put one stderr handler on the ``longpole`` logger, at level WARNING.
+
+    Our own handler, because the one Python falls back to prints bare text
+    and nothing below WARNING. Called on every :func:`main` rather than at
+    import: pytest swaps ``sys.stderr`` per test, and a handler keeps the
+    stream it was created with. :func:`launcher` applies ``--log-level``
+    afterwards.
+    """
+    logger = logging.getLogger("longpole")
+    logger.handlers.clear()
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)

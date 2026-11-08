@@ -76,12 +76,7 @@ inside pytest by importing `main` and passing a list of arguments.
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and turn every outcome into an exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
-    logger = logging.getLogger("longpole")
-    logger.handlers.clear()  # pytest swaps sys.stderr per test; the handler must follow
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.WARNING)  # the launcher applies --log-level
+    init_logging()
     try:
         return app.meta(args, exit_on_error=False, print_error=False)
     except Exception as exc:
