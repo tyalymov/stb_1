@@ -17,14 +17,16 @@ run is stored but labelled, and the status line asks for a reconfigure.
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from longpole import __version__, context, env, output, units
+from longpole import __version__, env, output, units
 from longpole.analyzers.critical_path import CriticalPath, critical_path
 from longpole.cmake import fileapi, snippets, tooling
+from longpole.commands.options import Store
 from longpole.errors import CMakeToolError
 from longpole.model import Graph, Manifest, Run
 from longpole.store import RunStore, new_run_id, resolve_store
@@ -36,6 +38,9 @@ NEEDS_RECONFIGURE_LABEL = "needs-reconfigure"
 
 NO_GRAPH_LABEL = "no-graph"
 """Label of a run captured before the File API answered; the critical path needs the graph."""
+
+CI_RUN_ID_VARIABLE = "GITHUB_RUN_ID"
+"""Set by GitHub Actions; a run captured under it is labelled ``ci:<id>``."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -59,7 +64,7 @@ class Outcome:
     needs_reconfigure: bool
 
 
-def capture(index: Path, /, *, label: tuple[str, ...] = ()) -> int:
+def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None) -> int:
     """Store the run an instrumentation index describes; CMake runs this at each hook.
 
     Read a CMake instrumentation index and its snippets, add the target graph
@@ -70,6 +75,7 @@ def capture(index: Path, /, *, label: tuple[str, ...] = ()) -> int:
     Args:
         index: Index file; CMake appends it to the callback.
         label: Label the run; may be repeated (a CI run id is added automatically).
+        store: Run store to write to instead of the resolved one.
 
     Returns:
         0; a skipped empty index is a success too.
@@ -82,17 +88,11 @@ def capture(index: Path, /, *, label: tuple[str, ...] = ()) -> int:
         FileApiError: A File API reply exists but cannot be read.
         OSError: The store cannot be written.
     """
-    cli = context.cli()
-    environment = context.env()
     labels = list(label)
-    if environment.ci_run_id is not None:
-        labels.append(f"ci:{environment.ci_run_id}")
-    outcome = record(
-        index,
-        store_override=cli.store,
-        environ=environment.environ,
-        labels=tuple(labels),
-    )
+    ci_run_id = os.environ.get(CI_RUN_ID_VARIABLE)
+    if ci_run_id:
+        labels.append(f"ci:{ci_run_id}")
+    outcome = record(index, store_override=store, environ=os.environ, labels=tuple(labels))
     output.stderr(status_line(outcome))
     return 0
 

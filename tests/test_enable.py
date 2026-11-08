@@ -111,7 +111,7 @@ def test_enable_is_idempotent_and_json_reports_the_same_paths(
     first = (build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json").read_bytes()
     capsys.readouterr()
 
-    assert main(["--json", "enable", str(build), "--cmake", str(cmake_binary)]) == 0
+    assert main(["enable", str(build), "--cmake", str(cmake_binary), "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert Path(report["query"]).read_bytes() == first
     assert report["scope"] == "tree"
@@ -164,7 +164,7 @@ def test_configured_tree_gets_the_regenerate_hint(
     """
     project = make_project("chain", tmp_path, cmake_binary)
     project.configure()
-    assert main(["--json", "enable", str(project.build_dir)]) == 0
+    assert main(["enable", str(project.build_dir), "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["regenerate_needed"] is True
     assert report["cmake_version"].startswith(

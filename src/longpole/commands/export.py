@@ -14,10 +14,11 @@ from typing import Annotated
 
 from cyclopts import Parameter
 
-from longpole import context, output
+from longpole import output
 from longpole.analyzers.report import build_report
 from longpole.cmake import tooling
 from longpole.commands.analyze import load_run
+from longpole.commands.options import Store
 from longpole.errors import UsageError
 from longpole.exporters import markdown as markdown_snapshot
 from longpole.exporters import perfetto as perfetto_trace
@@ -34,6 +35,7 @@ def export(
     *,
     perfetto: Annotated[str | None, Parameter(metavar="PATH", allow_leading_hyphen=True)] = None,
     markdown: Annotated[str | None, Parameter(metavar="PATH", allow_leading_hyphen=True)] = None,
+    store: Store = None,
 ) -> int:
     """Write a run as a Perfetto trace or a Markdown snapshot.
 
@@ -47,6 +49,7 @@ def export(
             or a dump path.
         perfetto: Write the Perfetto trace to PATH ('-' for standard output).
         markdown: Write the Markdown snapshot to PATH ('-' for standard output).
+        store: Run store to read instead of the resolved one.
 
     Returns:
         0 on success.
@@ -61,11 +64,8 @@ def export(
         raise UsageError(
             "export: choose at least one format, e.g. --perfetto trace.json or --markdown run.md"
         )
-    cli = context.cli()
-    env = context.env()
-    tree = tooling.find_build_tree(env.cwd)
-    store = RunStore(resolve_store(cli.store, build_dir=tree, environ=env.environ))
-    loaded = load_run(store, run, tree)
+    tree = tooling.find_build_tree(Path.cwd())
+    loaded = load_run(RunStore(resolve_store(store, build_dir=tree)), run, tree)
     report = build_report(loaded)
     if perfetto is not None:
         _write(perfetto, perfetto_trace.format_trace(loaded, report), "Perfetto trace")

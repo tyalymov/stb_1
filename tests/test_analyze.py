@@ -63,11 +63,11 @@ def test_json_defaults_to_the_newest_run_and_accepts_references(
     newer = sample_run(run_id="20261031T120100Z-000002", created_at="2026-10-31T12:01:00+00:00")
     store = _store_with(tmp_path, older, newer)
 
-    assert main(["--store", str(store), "--json", "analyze"]) == 0
+    assert main(["analyze", "--store", str(store), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120100Z-000002"
-    assert main(["--store", str(store), "--json", "analyze", "latest~1"]) == 0
+    assert main(["analyze", "latest~1", "--store", str(store), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-000001"
-    assert main(["--store", str(store), "--json", "analyze", "20261031T120000Z"]) == 0
+    assert main(["analyze", "20261031T120000Z", "--store", str(store), "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["summary"]["run_id"] == "20261031T120000Z-000001"
     assert report["summary"]["totals"]["step_count"] == 8
@@ -79,7 +79,7 @@ def test_json_defaults_to_the_newest_run_and_accepts_references(
 def test_top_limits_the_tables(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """--top caps every slowest-items table."""
     store = _store_with(tmp_path, sample_run())
-    assert main(["--store", str(store), "--json", "analyze", "--top", "1"]) == 0
+    assert main(["analyze", "--top", "1", "--store", str(store), "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert len(report["summary"]["slowest_targets"]) == 1
     assert len(report["summary"]["slowest_sources"]) == 1
@@ -106,7 +106,7 @@ def test_inside_a_build_tree_the_default_is_that_trees_newest_run(
     store = _store_with(tmp_path, mine, elsewhere)
 
     monkeypatch.chdir(tree / "CMakeFiles")
-    assert main(["--store", str(store), "--json", "analyze"]) == 0
+    assert main(["analyze", "--store", str(store), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-000001"
 
 
@@ -119,7 +119,7 @@ def test_tree_without_runs_is_an_error_not_a_fallback(
     (tree / "CMakeCache.txt").write_text("", encoding="utf-8")
     store = _store_with(tmp_path, sample_run(build_dir="/somewhere/else/build"))
     monkeypatch.chdir(tree)
-    assert main(["--store", str(store), "analyze"]) == 1
+    assert main(["analyze", "--store", str(store)]) == 1
     err = capsys.readouterr().err
     assert f"no runs from {tree.resolve()}" in err
     assert "longpole enable" in err
@@ -130,10 +130,10 @@ def test_empty_store_is_an_error_with_a_hint(
 ) -> None:
     """An empty store says so and points at enable; an unknown reference names itself."""
     monkeypatch.chdir(tmp_path)
-    assert main(["--store", str(tmp_path / "store"), "analyze"]) == 1
+    assert main(["analyze", "--store", str(tmp_path / "store")]) == 1
     assert "no runs in" in capsys.readouterr().err
     store = _store_with(tmp_path, sample_run())
-    assert main(["--store", str(store), "analyze", "label:nope"]) == 1
+    assert main(["analyze", "label:nope", "--store", str(store)]) == 1
     assert "no run labelled 'nope'" in capsys.readouterr().err
 
 
@@ -144,7 +144,7 @@ def test_real_chain_run_renders_its_targets_and_custom_commands(
 ) -> None:
     """A real build shows a, b and c as targets and the three generators as custom commands."""
     store = _store_with(tmp_path, chain_run)
-    assert main(["--store", str(store), "analyze"]) == 0
+    assert main(["analyze", "--store", str(store)]) == 0
     text = capsys.readouterr().out
     assert "slowest targets" in text
     assert "slowest custom commands" in text

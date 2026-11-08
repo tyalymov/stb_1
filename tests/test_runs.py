@@ -55,7 +55,7 @@ def test_listing_shows_every_run_with_its_tree(
 ) -> None:
     """Outside any tree both runs are listed, oldest first, with the build dir column."""
     monkeypatch.chdir(tmp_path)
-    assert main(["--store", str(_store(tmp_path)), "runs"]) == 0
+    assert main(["runs", "--store", str(_store(tmp_path))]) == 0
     out = capsys.readouterr().out
     assert out.index("20261031T120000Z-000001") < out.index("20261031T120100Z-000002")
     assert "    /elsewhere/build\n" in out, "the tree follows on its own indented line"
@@ -80,10 +80,10 @@ def test_inside_a_tree_only_its_runs_are_listed_unless_all(
         )
     )
     monkeypatch.chdir(tree)
-    assert main(["--store", str(store.root), "--json", "runs"]) == 0
+    assert main(["runs", "--store", str(store.root), "--json"]) == 0
     ids = [entry["run_id"] for entry in json.loads(capsys.readouterr().out)]
     assert ids == ["20261031T120000Z-000001"]
-    assert main(["--store", str(store.root), "--json", "runs", "--all"]) == 0
+    assert main(["runs", "--all", "--store", str(store.root), "--json"]) == 0
     assert len(json.loads(capsys.readouterr().out)) == 2
 
 
@@ -104,12 +104,12 @@ def test_filters_by_label_and_age(
             labels=("ci:42",),
         )
     )
-    assert main(["--store", str(store.root), "--json", "runs", "--label", "ci:42"]) == 0
+    assert main(["runs", "--label", "ci:42", "--store", str(store.root), "--json"]) == 0
     assert [e["labels"] for e in json.loads(capsys.readouterr().out)] == [["ci:42"]]
-    assert main(["--store", str(store.root), "--json", "runs", "--since", "1h"]) == 0
+    assert main(["runs", "--since", "1h", "--store", str(store.root), "--json"]) == 0
     listed = json.loads(capsys.readouterr().out)
     assert len(listed) == 1 and listed[0]["labels"] == ["ci:42"]
-    assert main(["--store", str(store.root), "runs", "--since", "yesterday"]) == 1
+    assert main(["runs", "--since", "yesterday", "--store", str(store.root)]) == 1
 
 
 def test_show_prints_the_manifest(
@@ -118,12 +118,12 @@ def test_show_prints_the_manifest(
     """The show action prints the manifest as a table, or as JSON with the step count."""
     monkeypatch.chdir(tmp_path)
     store = _store(tmp_path)
-    assert main(["--store", str(store), "runs", "show", "latest"]) == 0
+    assert main(["runs", "show", "latest", "--store", str(store)]) == 0
     out = capsys.readouterr().out
     assert "20261031T120100Z-000002" in out
     assert "/work/project/build" in out
     assert "0123456789ab main" in out
-    assert main(["--store", str(store), "--json", "runs", "show", "latest~1"]) == 0
+    assert main(["runs", "show", "latest~1", "--store", str(store), "--json"]) == 0
     document = json.loads(capsys.readouterr().out)
     assert document["run_id"] == "20261031T120000Z-000001"
     assert document["steps"] == 8
@@ -136,9 +136,9 @@ def test_prune_deletes_old_runs_and_needs_a_limit(
     """Pruning with --keep 1 removes the older run and names it; prune alone is a usage error."""
     monkeypatch.chdir(tmp_path)
     store = _store(tmp_path)
-    assert main(["--store", str(store), "runs", "prune"]) == 1
+    assert main(["runs", "prune", "--store", str(store)]) == 1
     assert "give --keep" in capsys.readouterr().err
-    assert main(["--store", str(store), "runs", "prune", "--keep", "1"]) == 0
+    assert main(["runs", "prune", "--keep", "1", "--store", str(store)]) == 0
     assert capsys.readouterr().out.strip() == "20261031T120000Z-000001"
-    assert main(["--store", str(store), "--json", "runs"]) == 0
+    assert main(["runs", "--store", str(store), "--json"]) == 0
     assert [e["run_id"] for e in json.loads(capsys.readouterr().out)] == ["20261031T120100Z-000002"]

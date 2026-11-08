@@ -88,20 +88,20 @@ def test_export_writes_markdown(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert (
         main(
             [
-                "--store",
-                str(store.root),
                 "export",
                 "--markdown",
                 str(snapshot),
                 "--perfetto",
                 str(trace),
+                "--store",
+                str(store.root),
             ]
         )
         == 0
     )
     assert snapshot.read_text(encoding="utf-8").startswith("## longpole: postCMakeBuild")
     assert trace.exists()
-    assert main(["--store", str(store.root), "export", "--markdown", "-"]) == 0
+    assert main(["export", "--markdown", "-", "--store", str(store.root)]) == 0
     assert "### Parallelism" in capsys.readouterr().out
 
 

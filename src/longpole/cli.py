@@ -16,8 +16,6 @@ as a run, and shows what actually gated it.
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Parameters ─────────────────────────────────────────────────────────────────────────────────────╮
 │ --log-level CHOICE  How much to say on stderr: debug, info, warning (the default) or error.      │
-│ --store PATH        Run store to use instead of the one resolved from the tree and environment.  │
-│ --json              Print results as JSON instead of tables.                                     │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 """
 
@@ -26,16 +24,13 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Sequence
-from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from cyclopts import App, Parameter
 from rich.console import Console
 
-from longpole import __version__, context
-from longpole.cli_config import CliConfig, LogLevel
+from longpole import __version__
 from longpole.commands import analyze, capture, doctor, enable, export, runs
-from longpole.env_config import load_env
 from longpole.errors import UsageError
 
 log = logging.getLogger(__name__)
@@ -67,23 +62,18 @@ app.command(runs.app)
 @app.meta.default
 def launcher(
     *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
-    log_level: LogLevel = "warning",
-    store: Path | None = None,
-    json: bool = False,
+    log_level: Literal["debug", "info", "warning", "error"] = "warning",
 ) -> int:
-    """Parse the global options, publish them and run the command.
+    """Apply the option that comes before the command word, then run the command.
 
-    This is the meta app in front of :data:`app`: it owns the options that
-    come before the command word, publishes them through
-    :mod:`longpole.context` and hands the remaining tokens to the command.
-    That is how ``longpole --json analyze`` gets its flag before the command,
-    the way git does it.
+    This is the meta app in front of :data:`app`. ``--log-level`` is the one
+    option every command shares and the one thing that has to happen before
+    any command runs, so it lives here; everything else a command needs is
+    in its own signature.
 
     Args:
         *tokens: The command and its arguments.
         log_level: How much to say on stderr: debug, info, warning (the default) or error.
-        store: Run store to use instead of the one resolved from the tree and environment.
-        json: Print results as JSON instead of tables.
 
     Returns:
         The command's exit code.
@@ -94,9 +84,7 @@ def launcher(
     if not tokens:
         raise UsageError("no command given; see --help")
     logging.getLogger("longpole").setLevel(log_level.upper())
-    cli = CliConfig(log_level=log_level, store=store, json_output=json)
-    with context.activate(cli, load_env()):
-        return app(tokens, exit_on_error=False, print_error=False)
+    return app(tokens, exit_on_error=False, print_error=False)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

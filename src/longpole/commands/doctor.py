@@ -11,16 +11,18 @@ also works as a gate in a script.
 
 from __future__ import annotations
 
-import json
+import json as json_module
 import logging
+import os
 import shutil
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
-from longpole import context, output
+from longpole import output
 from longpole.cmake import fileapi, tooling
+from longpole.commands.options import Json, Store
 from longpole.errors import CMakeToolError
 from longpole.exporters import terminal
 from longpole.jsonfields import FieldError, load_object
@@ -75,7 +77,9 @@ class Report:
         return tuple(seen)
 
 
-def doctor(build_dir: Path, /, *, cmake: Path | None = None) -> int:
+def doctor(
+    build_dir: Path, /, *, cmake: Path | None = None, store: Store = None, json: Json = False
+) -> int:
     """Check whether a build tree records its builds, and say what to fix if not.
 
     Look at the cmake executable, the generator, the query files, the build
@@ -86,19 +90,15 @@ def doctor(build_dir: Path, /, *, cmake: Path | None = None) -> int:
         build_dir: Build tree to examine.
         cmake: cmake executable to consult; default: the one that configured
             the tree, else the first on PATH.
+        store: Run store to report on instead of the resolved one.
+        json: Print the report as JSON instead of a table.
 
     Returns:
         0 when no finding asks for an action, 1 otherwise.
     """
-    cli = context.cli()
-    report = examine(
-        build_dir,
-        cmake_override=cmake,
-        store_override=cli.store,
-        environ=context.env().environ,
-    )
-    if cli.json_output:
-        output.stdout(json.dumps(_as_json(report), indent=2))
+    report = examine(build_dir, cmake_override=cmake, store_override=store, environ=os.environ)
+    if json:
+        output.stdout(json_module.dumps(_as_json(report), indent=2))
     else:
         output.stdout(describe(report))
     return 1 if report.actions else 0

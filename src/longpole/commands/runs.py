@@ -8,7 +8,7 @@ run's manifest, ``prune`` deletes old runs by count or by age.
 
 from __future__ import annotations
 
-import json
+import json as json_module
 import logging
 import re
 from dataclasses import asdict
@@ -18,8 +18,9 @@ from typing import Annotated
 
 from cyclopts import App, Parameter, Token
 
-from longpole import context, output, units
+from longpole import output, units
 from longpole.cmake import tooling
+from longpole.commands.options import Json, Store
 from longpole.errors import UsageError
 from longpole.exporters import terminal
 from longpole.model import Manifest
@@ -81,6 +82,8 @@ def list_runs(
     all_trees: Annotated[bool, Parameter(name="--all")] = False,
     since: Age = None,
     label: str | None = None,
+    store: Store = None,
+    json: Json = False,
 ) -> int:
     """List the runs in the store, newest last.
 
@@ -90,24 +93,28 @@ def list_runs(
         all_trees: Inside a build tree, list every tree's runs instead of this tree's.
         since: Only runs captured within AGE, e.g. 90m, 12h or 7d.
         label: Only runs carrying this label.
+        store: Run store to list instead of the resolved one.
+        json: Print the listing as JSON instead of aligned lines.
 
     Returns:
         0.
     """
-    cli = context.cli()
-    tree = tooling.find_build_tree(context.env().cwd)
-    store = RunStore(resolve_store(cli.store, build_dir=tree, environ=context.env().environ))
+    tree = tooling.find_build_tree(Path.cwd())
     build_dir = tree.resolve() if tree is not None and not all_trees else None
-    return _list(store, build_dir=build_dir, since=since, label=label, json_output=cli.json_output)
+    return _list(
+        _store(store, tree), build_dir=build_dir, since=since, label=label, json_output=json
+    )
 
 
 @app.command
-def show(run: str = "latest", /) -> int:
+def show(run: str = "latest", /, *, store: Store = None, json: Json = False) -> int:
     """Print one run's manifest.
 
     Args:
         run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
             or a dump path.
+        store: Run store to read instead of the resolved one.
+        json: Print the manifest as JSON instead of a table.
 
     Returns:
         0.
@@ -116,16 +123,20 @@ def show(run: str = "latest", /) -> int:
         UnknownRunError: The reference names no run.
         DumpFormatError: The run on disk is malformed.
     """
-    return _show(_store(), run, json_output=context.cli().json_output)
+    return _show(_store(store, tooling.find_build_tree(Path.cwd())), run, json_output=json)
 
 
 @app.command
-def prune(*, keep: int | None = None, older_than: Age = None) -> int:
+def prune(
+    *, keep: int | None = None, older_than: Age = None, store: Store = None, json: Json = False
+) -> int:
     """Delete old runs by count or by age.
 
     Args:
         keep: Keep only the N newest runs.
         older_than: Delete runs older than AGE, e.g. 90d.
+        store: Run store to prune instead of the resolved one.
+        json: Print the deleted ids as a JSON list instead of one per line.
 
     Returns:
         0.
@@ -135,18 +146,21 @@ def prune(*, keep: int | None = None, older_than: Age = None) -> int:
     """
     if keep is None and older_than is None:
         raise UsageError("runs prune: give --keep N, --older-than AGE, or both")
-    return _prune(_store(), keep=keep, older_than=older_than, json_output=context.cli().json_output)
+    runs = _store(store, tooling.find_build_tree(Path.cwd()))
+    return _prune(runs, keep=keep, older_than=older_than, json_output=json)
 
 
-def _store() -> RunStore:
-    """The store the global options and the working directory point at.
+def _store(explicit: Path | None, tree: Path | None) -> RunStore:
+    """Open the store ``--store`` or the build tree points at.
+
+    Args:
+        explicit: ``--store``, if given.
+        tree: The build tree the working directory is in, or ``None``.
 
     Returns:
         The store.
     """
-    env = context.env()
-    tree = tooling.find_build_tree(env.cwd)
-    return RunStore(resolve_store(context.cli().store, build_dir=tree, environ=env.environ))
+    return RunStore(resolve_store(explicit, build_dir=tree))
 
 
 def _list(
@@ -172,7 +186,7 @@ def _list(
     cutoff = datetime.now(UTC) - since if since is not None else None
     summaries = store.list(build_dir=build_dir, label=label, since=cutoff)
     if json_output:
-        output.stdout(json.dumps([asdict(summary) for summary in summaries], indent=2))
+        output.stdout(json_module.dumps([asdict(summary) for summary in summaries], indent=2))
         return 0
     if not summaries:
         scope = f" from {build_dir}" if build_dir is not None else ""
@@ -253,7 +267,7 @@ def _show(store: RunStore, ref: str, *, json_output: bool) -> int:
         document = asdict(manifest)
         document["steps"] = len(loaded.steps)
         document["has_graph"] = loaded.graph is not None
-        output.stdout(json.dumps(document, indent=2))
+        output.stdout(json_module.dumps(document, indent=2))
         return 0
     environment = manifest.environment
     rows = [
@@ -311,7 +325,7 @@ def _prune(
     """
     deleted = store.prune(keep=keep, older_than=older_than)
     if json_output:
-        output.stdout(json.dumps(deleted))
+        output.stdout(json_module.dumps(deleted))
     elif deleted:
         output.stdout("\n".join(deleted))
     log.info("deleted %d run(s) from %s", len(deleted), store.root)

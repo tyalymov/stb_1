@@ -123,15 +123,15 @@ def test_export_writes_a_file_or_stdout(tmp_path: Path, capsys: pytest.CaptureFi
     store.write(sample_run())
     target = tmp_path / "trace.json"
 
-    assert main(["--store", str(store.root), "export", "latest", "--perfetto", str(target)]) == 0
+    assert main(["export", "latest", "--perfetto", str(target), "--store", str(store.root)]) == 0
     document = json.loads(target.read_text(encoding="utf-8"))
     assert document["otherData"]["run_id"] == "20261031T120000Z-abc123"
     assert document["displayTimeUnit"] == "ms"
 
-    assert main(["--store", str(store.root), "export", "--perfetto", "-"]) == 0
+    assert main(["export", "--perfetto", "-", "--store", str(store.root)]) == 0
     assert json.loads(capsys.readouterr().out)["otherData"]["hook"] == "postCMakeBuild"
 
-    assert main(["--store", str(store.root), "export", "latest"]) == 1
+    assert main(["export", "latest", "--store", str(store.root)]) == 1
     assert "choose at least one format" in capsys.readouterr().err
 
 

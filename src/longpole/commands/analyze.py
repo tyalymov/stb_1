@@ -9,12 +9,13 @@ store. A reference selects any other run: an id or prefix, ``latest``,
 
 from __future__ import annotations
 
-import json
+import json as json_module
 from pathlib import Path
 
-from longpole import context, output
+from longpole import output
 from longpole.analyzers.report import build_report, to_json
 from longpole.cmake import tooling
+from longpole.commands.options import Json, Store
 from longpole.errors import UnknownRunError
 from longpole.exporters import terminal
 from longpole.model import Run
@@ -23,7 +24,9 @@ from longpole.store import RunStore, resolve_store
 DEFAULT_TOP = 10
 
 
-def analyze(run: str | None = None, /, *, top: int = DEFAULT_TOP) -> int:
+def analyze(
+    run: str | None = None, /, *, top: int = DEFAULT_TOP, store: Store = None, json: Json = False
+) -> int:
     """Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.
 
     Print the report of one stored run: totals and phases, the slowest
@@ -35,6 +38,8 @@ def analyze(run: str | None = None, /, *, top: int = DEFAULT_TOP) -> int:
         run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
             or a dump path.
         top: Rows per table.
+        store: Run store to read instead of the resolved one.
+        json: Print the report as JSON instead of tables.
 
     Returns:
         0 on success.
@@ -43,13 +48,11 @@ def analyze(run: str | None = None, /, *, top: int = DEFAULT_TOP) -> int:
         UnknownRunError: The reference names no run, or there is no run to default to.
         DumpFormatError: The stored run is malformed.
     """
-    cli = context.cli()
-    env = context.env()
-    tree = tooling.find_build_tree(env.cwd)
-    store = RunStore(resolve_store(cli.store, build_dir=tree, environ=env.environ))
-    report = build_report(load_run(store, run, tree), top=top)
-    if cli.json_output:
-        output.stdout(json.dumps(to_json(report), indent=2))
+    tree = tooling.find_build_tree(Path.cwd())
+    runs = RunStore(resolve_store(store, build_dir=tree))
+    report = build_report(load_run(runs, run, tree), top=top)
+    if json:
+        output.stdout(json_module.dumps(to_json(report), indent=2))
     else:
         output.stdout(terminal.format_report(report))
     return 0

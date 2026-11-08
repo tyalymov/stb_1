@@ -17,7 +17,7 @@ each step is written into the build system at generate time.
 
 from __future__ import annotations
 
-import json
+import json as json_module
 import logging
 import shutil
 import sys
@@ -27,8 +27,9 @@ from typing import Annotated
 
 from cyclopts import Parameter
 
-from longpole import context, output
+from longpole import output
 from longpole.cmake import fileapi, tooling
+from longpole.commands.options import Json
 from longpole.errors import CMakeToolError, UnsupportedCMakeError, UsageError
 from longpole.model import DataVersion
 from longpole.store import IN_TREE
@@ -92,6 +93,7 @@ def enable(
     everywhere: Annotated[bool, Parameter(name="--global")] = False,
     remove: bool = False,
     cmake: Path | None = None,
+    json: Json = False,
 ) -> int:
     """Switch CMake instrumentation on for a build tree, or for every build with --global.
 
@@ -106,6 +108,7 @@ def enable(
         remove: Delete the query file written earlier.
         cmake: cmake executable to consult; default: the one that configured
             the tree, else the first on PATH.
+        json: Print the result as JSON instead of text.
 
     Returns:
         0 on success; failures raise.
@@ -121,8 +124,8 @@ def enable(
     executable = find_cmake(cmake, build_dir)
     worker = remove_query if remove else write_query
     result = worker(executable, build_dir)
-    if context.cli().json_output:
-        output.stdout(json.dumps(_as_json(result), indent=2))
+    if json:
+        output.stdout(json_module.dumps(_as_json(result), indent=2))
     else:
         output.stdout(_describe(result))
     return 0
@@ -157,7 +160,7 @@ def write_query(cmake: Path, build_dir: Path | None) -> EnableResult:
     query = query_location(cmake, build_dir)
     query.parent.mkdir(parents=True, exist_ok=True)
     document = query_document(info.data_version, callback)
-    query.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    query.write_text(json_module.dumps(document, indent=2) + "\n", encoding="utf-8")
     log.info("wrote %s", query)
 
     file_api_query: Path | None = None

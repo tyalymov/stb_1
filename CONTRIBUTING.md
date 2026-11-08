@@ -95,24 +95,16 @@ The rules behind that shape:
 - `argv` never contains the program name. `__main__` passes `sys.argv[1:]`
   explicitly; tests pass a list. The `None` branch exists only for the
   console script entry point, which calls `main()` without arguments.
-- The command line is parsed by [cyclopts](https://cyclopts.readthedocs.io/)
-  with a git-like layout: global flags first (`--log-level`, `--store`,
-  `--json`), then a command and its flags. The global flags belong to the
-  app's *meta* app, the `launcher` function in `cli.py`: it parses them,
-  publishes the configuration and hands the remaining tokens to the app
-  that holds the commands. Nothing exits the process: `exit_on_error=False` turns parse
-  errors into exceptions, and `result_action="return_int_as_exit_code_else_zero"`
-  makes `--help` and `--version` return 0 after printing. Otherwise `main`
-  could not be called from a test.
-- `load_env` reads everything from the environment in one place:
-  environment variables, XDG paths, tool versions.
-- `CliConfig` and `EnvConfig` are frozen dataclasses. They are published
-  through `contextvars` in `longpole.context`: `context.activate(cli, env)`
-  sets them for the duration of a block and restores the previous values
-  on exit; `context.cli()` and `context.env()` read them from anywhere.
-  Only the meta app and tests call `activate`. The reset on exit is what
-  lets a test call `main([...])` many times in one process without state
-  leaking between calls.
+- The command line is parsed by [cyclopts](https://cyclopts.readthedocs.io/).
+  One option comes before the command word, `--log-level`, because it is
+  the one thing every command shares and it has to take effect before any
+  command runs. It belongs to the app's *meta* app, the `launcher` function
+  in `cli.py`, which sets the logger level and hands the remaining tokens to
+  the app that holds the commands. Nothing exits the process:
+  `exit_on_error=False` turns parse errors into exceptions, and
+  `result_action="return_int_as_exit_code_else_zero"` makes `--help` and
+  `--version` return 0 after printing. Otherwise `main` could not be called
+  from a test.
 - Each command lives in its own file under `longpole/commands/` and is a
   plain function: its signature is its command line. Parameters before `/`
   are positional arguments, parameters after `*` are `--options`, the
@@ -120,9 +112,14 @@ The rules behind that shape:
   `Args:` section of its docstring is the help text, with the docstring's
   first paragraphs as the command's description. A command with actions of
   its own (`runs show`, `runs prune`) is a cyclopts `App` whose default
-  function handles the bare command. The function reads the global options
-  from `context.cli()` and `context.env()`, does the work and returns the
-  exit code. `cli.py` registers the commands on the module-level `app`.
+  function handles the bare command. Options several commands share, such
+  as `--store` and `--json`, are `Annotated` aliases in
+  `commands/options.py`, so their names and help text are written once and
+  each command that takes one says so in its signature. There is no shared
+  configuration object: a command gets everything it needs as parameters,
+  and reads the environment (`os.environ`, `Path.cwd()`) itself where that
+  is the point, as `resolve_store` does for `LONGPOLE_STORE`. `cli.py`
+  registers the commands on the module-level `app`.
 - Errors are a small hierarchy under `LongpoleError`. Low-level exceptions
   are wrapped at the layer boundary with a message a user can act on. `main`
   does not tell them apart: every exception is one `ERROR:` line on stderr

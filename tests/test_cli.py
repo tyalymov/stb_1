@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterator
-from pathlib import Path
 
 import pytest
 
-from longpole import __version__, cli, context, output
+from longpole import __version__, cli, output
 from longpole.cli import main
 from longpole.errors import LongpoleError
 
@@ -115,23 +114,6 @@ def test_bad_log_level_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> N
     assert "loud" in err
 
 
-def test_global_options_are_published(
-    register: Register, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Global flags before the command word land in CliConfig; a command reads them from context."""
-
-    def peek() -> int:
-        config = context.cli()
-        output.stdout(f"{config.log_level} {config.store} {config.json_output}")
-        return 0
-
-    register(peek)
-    assert main(["--log-level", "debug", "--store", "/tmp/store", "--json", "peek"]) == 0
-    assert capsys.readouterr().out == "debug /tmp/store True\n"
-    assert main(["peek"]) == 0
-    assert capsys.readouterr().out == "warning None False\n"
-
-
 def test_command_runs_with_its_arguments(
     register: Register, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -148,16 +130,6 @@ def test_missing_argument_is_a_usage_error(
     register(echo)
     assert main(["echo"]) == 1
     assert "WORD" in capsys.readouterr().err
-
-
-def test_context_is_cleared_after_main(register: Register) -> None:
-    """Once main returns, nothing is active any more, so the next call starts clean."""
-    register(echo)
-    assert main(["echo", "hello"]) == 0
-    with pytest.raises(RuntimeError, match="no active configuration"):
-        context.cli()
-    with pytest.raises(RuntimeError, match="no active configuration"):
-        context.env()
 
 
 def test_failure_is_logged_once_and_exits_1(
@@ -208,34 +180,3 @@ def test_log_level_controls_what_reaches_stderr(
     assert capsys.readouterr().err == "WARNING: shout\n"
     assert main(["--log-level", "debug", "chatty"]) == 0
     assert capsys.readouterr().err == "DEBUG: whisper\nWARNING: shout\n"
-
-
-def test_activate_restores_the_previous_configuration() -> None:
-    """Nested activations unwind in order, like any context manager should."""
-    from longpole.cli_config import CliConfig
-    from longpole.env_config import load_env
-
-    outer = CliConfig(log_level="warning", store=None, json_output=False)
-    inner = CliConfig(log_level="debug", store=Path("/inner"), json_output=True)
-    env = load_env()
-    with context.activate(outer, env):
-        with context.activate(inner, env):
-            assert context.cli() is inner
-        assert context.cli() is outer
-
-
-def test_load_env_snapshots_variables(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """The snapshot carries the CI run id and CMake's config dir; empty values count as unset."""
-    from longpole.env_config import load_env
-
-    monkeypatch.setenv("GITHUB_RUN_ID", "4242")
-    monkeypatch.setenv("CMAKE_CONFIG_DIR", str(tmp_path))
-    env = load_env(cwd=tmp_path)
-    assert env.cwd == tmp_path
-    assert env.ci_run_id == "4242"
-    assert env.cmake_config_dir == tmp_path
-    assert env.environ["GITHUB_RUN_ID"] == "4242"
-
-    bare = load_env({"GITHUB_RUN_ID": ""}, cwd=tmp_path)
-    assert bare.ci_run_id is None
-    assert bare.cmake_config_dir is None
