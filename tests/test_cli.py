@@ -85,14 +85,14 @@ def test_missing_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) ->
     assert main([]) == 2
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert captured.err == "longpole: error: no command given; see longpole --help\n"
+    assert captured.err == "error: no command given; see --help\n"
 
 
 def test_unknown_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
     """A word that is not a command is reported with the list of commands."""
     assert main(["frobnicate"]) == 2
     err = capsys.readouterr().err
-    assert err.startswith('longpole: error: Unknown command "frobnicate"')
+    assert err.startswith('error: Unknown command "frobnicate"')
     assert "enable, capture, doctor, analyze, export, runs" in err
 
 
@@ -173,7 +173,7 @@ def test_known_failure_maps_to_its_exit_code(
     assert main(["fail"]) == 3
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert captured.err == "longpole: ERROR: the disk is on fire\n"
+    assert captured.err == "ERROR: the disk is on fire\n"
 
 
 def test_unexpected_exception_is_logged_with_the_stack(
@@ -204,9 +204,9 @@ def test_log_level_controls_what_reaches_stderr(
 
     _with_command(monkeypatch, chatty)
     assert main(["chatty"]) == 0
-    assert capsys.readouterr().err == "longpole: WARNING: shout\n"
+    assert capsys.readouterr().err == "WARNING: shout\n"
     assert main(["--log-level", "debug", "chatty"]) == 0
-    assert capsys.readouterr().err == "longpole: DEBUG: whisper\nlongpole: WARNING: shout\n"
+    assert capsys.readouterr().err == "DEBUG: whisper\nWARNING: shout\n"
 
 
 def test_activate_restores_the_previous_configuration() -> None:

@@ -41,8 +41,6 @@ from longpole.errors import LongpoleError, UsageError
 
 log = logging.getLogger(__name__)
 
-PROGRAM = "longpole"
-
 EXIT_UNEXPECTED = 70
 """Exit code for an exception nothing expected; ``EX_SOFTWARE`` in ``sysexits.h``."""
 
@@ -76,10 +74,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = build_app(COMMANDS).meta(args, exit_on_error=False, print_error=False)
         return 0 if result is None else int(result)
     except CycloptsError as exc:
-        output.stderr(f"{PROGRAM}: error: {exc}")
+        output.stderr(f"error: {exc}")
         return UsageError.exit_code
     except UsageError as exc:
-        output.stderr(f"{PROGRAM}: error: {exc}")
+        output.stderr(f"error: {exc}")
         return exc.exit_code
     except LongpoleError as exc:
         log.error("%s", exc)
@@ -108,14 +106,14 @@ def build_app(commands: Sequence[Callable[..., int] | App]) -> App:
         The application; call its ``meta`` with the arguments.
     """
     app = App(
-        name=PROGRAM,
+        name="longpole",
         help=(
             "Find the long pole in your CMake build. longpole records the instrumentation "
             "data CMake 4.3 and later can write for every configure, compile, link, custom "
             "command and test step, stores each build as a run, and shows what actually "
             "gated it."
         ),
-        version=f"{PROGRAM} {__version__}",
+        version=f"longpole {__version__}",
         # Fixed width, so the help text does not depend on the terminal it is printed to.
         console=Console(width=100),
         help_format="plaintext",
@@ -151,7 +149,7 @@ def build_app(commands: Sequence[Callable[..., int] | App]) -> App:
             UsageError: No command was given.
         """
         if not tokens:
-            raise UsageError(f"no command given; see {PROGRAM} --help")
+            raise UsageError("no command given; see --help")
         configure_logging(log_level)
         cli = CliConfig(log_level=log_level, store=store, json_output=json)
         with context.activate(cli, load_env()):
@@ -199,5 +197,5 @@ def configure_logging(level: str) -> None:
             logger.removeHandler(handler)
     handler = logging.StreamHandler(sys.stderr)
     handler.set_name(HANDLER_NAME)
-    handler.setFormatter(logging.Formatter(f"{PROGRAM}: %(levelname)s: %(message)s"))
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(handler)

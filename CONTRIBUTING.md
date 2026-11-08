@@ -80,10 +80,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = build_app(COMMANDS).meta(args, exit_on_error=False, print_error=False)
         return 0 if result is None else int(result)
     except CycloptsError as exc:
-        output.stderr(f"{PROGRAM}: error: {exc}")
+        output.stderr(f"error: {exc}")
         return UsageError.exit_code
     except UsageError as exc:
-        output.stderr(f"{PROGRAM}: error: {exc}")
+        output.stderr(f"error: {exc}")
         return exc.exit_code
     except LongpoleError as exc:
         log.error("%s", exc)
