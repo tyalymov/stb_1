@@ -162,9 +162,6 @@ def test_configured_tree_gets_the_regenerate_hint(
     assert main(["enable", str(project.build_dir), "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["regenerate_needed"] is True
-    assert report["cmake_version"].startswith(
-        ".".join(map(str, cmake_version_of(cmake_on_path)[:2]))
-    )
 
     assert main(["enable", str(project.build_dir)]) == 0
     assert "run cmake again" in capsys.readouterr().out
@@ -179,7 +176,7 @@ def test_missing_cmake_is_a_warning_not_a_refusal(
     assert main(["enable", str(build)]) == 0
     captured = capsys.readouterr()
     assert "WARNING: no cmake on PATH" in captured.err
-    assert "data version: 1.0 (cmake not found)" in captured.out
+    assert captured.out.startswith("enabled (tree): ")
     document = json.loads(
         (build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json").read_text()
     )
@@ -202,7 +199,7 @@ def test_old_cmake_is_a_warning_not_a_refusal(
     assert main(["enable", str(tmp_path / "build")]) == 0
     captured = capsys.readouterr()
     assert "WARNING: cmake on PATH is 3.31.9, older than 4.3" in captured.err
-    assert "data version: 1.0 (cmake 3.31.9)" in captured.out
+    assert captured.out.startswith("enabled (tree): ")
 
 
 def test_global_without_cmake_is_an_error(

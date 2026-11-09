@@ -45,9 +45,8 @@ class EnableResult:
         scope: ``tree`` or ``global``.
         query: Path of the query file written.
         callback: Command line CMake will run.
-        cmake_version: Version of the ``cmake`` on PATH, or ``None`` when there was none.
-        data_version: Data version requested in the query, as ``major.minor``.
-        file_api_query: File API query file written for a build tree, or ``None``.
+        file_api_query: File API query file written for a build tree, or
+            ``None`` in global mode, where there is no tree to put it in.
         regenerate_needed: The tree is already configured, so the query takes
             full effect only after the next ``cmake`` run.
     """
@@ -55,8 +54,6 @@ class EnableResult:
     scope: str
     query: Path
     callback: str
-    cmake_version: str | None
-    data_version: str
     file_api_query: Path | None
     regenerate_needed: bool
 
@@ -147,8 +144,6 @@ def write_query(build_dir: Path | None) -> EnableResult:
         scope="global" if build_dir is None else "tree",
         query=query,
         callback=callback,
-        cmake_version=info.version if info is not None else None,
-        data_version=str(data_version),
         file_api_query=file_api_query,
         regenerate_needed=regenerate_needed,
     )
@@ -273,13 +268,7 @@ def _describe(result: EnableResult) -> str:
     Returns:
         The text.
     """
-    lines = [
-        f"enabled ({result.scope}): {result.query}",
-        f"callback: {result.callback}",
-        f"data version: {result.data_version} (cmake {result.cmake_version or 'not found'})",
-    ]
-    if result.file_api_query is not None:
-        lines.append(f"target graph: File API query at {result.file_api_query}")
+    lines = [f"enabled ({result.scope}): {result.query}", f"callback: {result.callback}"]
     if result.regenerate_needed:
         lines.append(
             "next: this tree is already configured; run cmake again so the recording "
