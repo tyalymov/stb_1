@@ -59,31 +59,11 @@ def test_query_asks_for_process_metrics_only_from_data_1_2() -> None:
     assert old["hooks"] == new["hooks"] == CAPTURE_HOOKS
 
 
-def test_callback_names_the_installed_longpole(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The callback names the `longpole` on PATH by absolute path."""
-    monkeypatch.setattr(shutil, "which", _which(longpole="/opt/tools/bin/longpole"))
-    assert (
-        enable.callback_command(store=Path("/opt/runs"))
-        == '"/opt/tools/bin/longpole" capture --store "/opt/runs"'
-    )
-
-
-def test_without_longpole_on_path_enable_refuses(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """No installed command to name means nothing to write; the message says how to fix it."""
-    monkeypatch.setattr(shutil, "which", _which())
-    assert main(["enable", str(tmp_path / "build")]) == 1
-    assert "no longpole on PATH" in capsys.readouterr().err
-
-
-def test_labels_and_store_go_into_the_callback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_labels_and_store_go_into_the_callback() -> None:
     """The callback gets nothing from the enabling shell, so labels and the store ride along."""
-    monkeypatch.setattr(shutil, "which", _which(longpole="/opt/tools/bin/longpole"))
     command = enable.callback_command(store=Path("/opt/runs/my store"), labels=("nightly", "ci:42"))
     assert command == (
-        '"/opt/tools/bin/longpole" capture --store "/opt/runs/my store" '
-        '--label "nightly" --label "ci:42"'
+        'longpole capture --store "/opt/runs/my store" --label "nightly" --label "ci:42"'
     )
 
 
@@ -167,7 +147,7 @@ def test_missing_cmake_is_a_warning_not_a_refusal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """No cmake on PATH: the query is still written, for data version 1.0, with a warning."""
-    monkeypatch.setattr(shutil, "which", _which(longpole="/opt/tools/bin/longpole"))
+    monkeypatch.setattr(shutil, "which", _which())
     build = tmp_path / "build"
     assert main(["enable", str(build)]) == 0
     captured = capsys.readouterr()
@@ -190,9 +170,7 @@ def test_old_cmake_is_a_warning_not_a_refusal(
             executable=cmake, version="3.31.9", version_tuple=(3, 31, 9), data_version=None
         )
 
-    monkeypatch.setattr(
-        shutil, "which", _which(cmake="/fake/cmake", longpole="/opt/tools/bin/longpole")
-    )
+    monkeypatch.setattr(shutil, "which", _which(cmake="/fake/cmake"))
     monkeypatch.setattr(tooling, "describe", describe)
     assert main(["enable", str(tmp_path / "build")]) == 0
     captured = capsys.readouterr()

@@ -74,7 +74,6 @@ def enable(
         0 on success; failures raise.
 
     Raises:
-        FileNotFoundError: No ``longpole`` on PATH to name as the callback.
         OSError: A query directory cannot be created or written.
     """
     result = write_query(build_dir, labels=label, store=store)
@@ -105,7 +104,6 @@ def write_query(
         What was written.
 
     Raises:
-        FileNotFoundError: No ``longpole`` on PATH to name as the callback.
         OSError: A directory cannot be created or a file written.
     """
     info = _cmake_on_path()
@@ -201,31 +199,23 @@ def query_document(data_version: DataVersion, callback: str) -> dict[str, object
 def callback_command(*, store: Path, labels: tuple[str, ...] = ()) -> str:
     """The command line CMake runs at each hook.
 
-    IDEs and CI runners often start ``cmake`` with a different ``PATH`` than
-    the shell that ran ``enable``, so the command names the installed
-    ``longpole`` by absolute path. The store and the labels go on the
-    command line too, since the callback gets nothing else from the shell
-    that enabled recording; the store is made absolute for the same reason.
+    The command is ``longpole capture``, resolved on the PATH of whatever
+    runs ``cmake``; an IDE or runner whose PATH lacks it gets a bare ``no
+    such file or directory`` from CMake and records nothing, which is for
+    ``doctor`` to point out. The store and the labels go on the command line,
+    since the callback gets nothing else from the shell that enabled
+    recording; the store is made absolute for the same reason.
 
     Args:
         store: ``--store`` for the callback.
         labels: ``--label`` values for the callback.
 
     Returns:
-        ``"<path>" capture --store "PATH" [--label "NAME"]...``; every value
+        ``longpole capture --store "PATH" [--label "NAME"]...``; every value
         is double-quoted, which CMake's argument splitting reads the same
         whether or not it contains whitespace.
-
-    Raises:
-        FileNotFoundError: No ``longpole`` on PATH to name.
     """
-    script = shutil.which("longpole")
-    if script is None:
-        raise FileNotFoundError(
-            "no longpole on PATH to name as the callback; install it so that "
-            "`longpole --version` works, then run enable again"
-        )
-    command = f'"{script}" capture --store "{store.resolve()}"'
+    command = f'longpole capture --store "{store.resolve()}"'
     for label in labels:
         command += f' --label "{label}"'
     return command

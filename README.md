@@ -208,6 +208,9 @@ longpole enable build --store "$RUNNER_TEMP/longpole" --label "ci:$GITHUB_RUN_ID
   traces.
 - The recorded steps are what CMake launched. Work that happens outside
   them, such as `ccache` serving a hit, appears only as a short step.
+- The callback is `longpole capture`, found on the PATH of whatever runs
+  `cmake`. An IDE or a runner with its own environment may not have it; CMake
+  then prints only `no such file or directory` and records nothing.
 
 Known behaviour of the instrumentation API across CMake releases, as
 measured by this project's tests, is in
