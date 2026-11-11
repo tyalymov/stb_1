@@ -113,9 +113,7 @@ def test_enable_writes_query_graph_request_and_store_marker(
     assert fileapi.query_path(build).is_file()
     assert (build / IN_TREE).is_dir()
 
-    out = capsys.readouterr().out
-    assert out.startswith(f"enabled: {query}")
-    assert "run cmake again" not in out
+    assert capsys.readouterr().out.startswith(f"enabled: {query}")
 
 
 @pytest.mark.cmake
@@ -131,7 +129,6 @@ def test_enable_is_idempotent_and_json_reports_the_same_paths(
     assert main(["enable", str(build), "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert Path(report["query"]).read_bytes() == first
-    assert report["regenerate_needed"] is False
     assert report["file_api_query"] == str(fileapi.query_path(build))
 
 
@@ -150,22 +147,6 @@ def test_disable_deletes_the_queries_but_keeps_the_store(
     assert capsys.readouterr().out.splitlines()[-1] == f"removed {query}"
 
     assert main(["disable", str(build)]) == 0
-
-
-@pytest.mark.cmake
-@pytest.mark.slow
-def test_configured_tree_gets_the_regenerate_hint(
-    tmp_path: Path, cmake_on_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Enabling after configure works only after another cmake run, and the command says so."""
-    project = make_project("chain", tmp_path, cmake_on_path)
-    project.configure()
-    assert main(["enable", str(project.build_dir), "--output-format", "json"]) == 0
-    report = json.loads(capsys.readouterr().out)
-    assert report["regenerate_needed"] is True
-
-    assert main(["enable", str(project.build_dir)]) == 0
-    assert "run cmake again" in capsys.readouterr().out
 
 
 @pytest.mark.cmake

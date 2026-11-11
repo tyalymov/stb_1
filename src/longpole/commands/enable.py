@@ -10,8 +10,9 @@ the callback stores the run.
 The command also plants a File API query, so the next configure answers
 with the target graph the critical path needs, and marks the tree as having
 its own run store. A tree that was configured before the query existed has
-to be configured once more: the launcher that records each step is written
-into the build system at generate time.
+to be configured once more, since the launcher that records each step is
+written into the build system at generate time; ``analyze`` and ``doctor``
+say so when they meet such a run.
 """
 
 from __future__ import annotations
@@ -41,14 +42,11 @@ class EnableResult:
         query: Path of the query file written.
         callback: Command line CMake will run.
         file_api_query: File API query file written next to it.
-        regenerate_needed: The tree is already configured, so the query takes
-            full effect only after the next ``cmake`` run.
     """
 
     query: Path
     callback: str
     file_api_query: Path
-    regenerate_needed: bool
 
 
 def enable(
@@ -132,12 +130,7 @@ def write_query(
     file_api_query = fileapi.write_query(build_dir)
     if store is None:  # an in-tree store would shadow the one the callback writes to
         (build_dir / IN_TREE).mkdir(parents=True, exist_ok=True)
-    return EnableResult(
-        query=query,
-        callback=callback,
-        file_api_query=file_api_query,
-        regenerate_needed=(build_dir / "CMakeCache.txt").is_file(),
-    )
+    return EnableResult(query=query, callback=callback, file_api_query=file_api_query)
 
 
 def _cmake_on_path() -> tooling.CMakeInfo | None:
@@ -256,10 +249,4 @@ def _describe(result: EnableResult) -> str:
     Returns:
         The text.
     """
-    lines = [f"enabled: {result.query}", f"callback: {result.callback}"]
-    if result.regenerate_needed:
-        lines.append(
-            "next: this tree is already configured; run cmake again so the recording "
-            "launcher is written into the build system"
-        )
-    return "\n".join(lines)
+    return f"enabled: {result.query}\ncallback: {result.callback}"
