@@ -38,7 +38,7 @@ def run_from_capture(capture: CapturedIndex, build_dir: Path) -> Run:
     index = snippets.read_index(
         capture.directory / "index.json", data_dir=capture.directory / "snippets"
     )
-    reply = fileapi.read_reply(build_dir)
+    reply = fileapi.read_reply(fileapi.reply_dir(build_dir))
     return Run(
         manifest=Manifest(
             run_id=new_run_id(),

@@ -380,7 +380,7 @@ def _graph_finding(build_dir: Path, configured: bool) -> Finding:
             detail="no File API query yet; the first capture plants one and the next configure "
             "answers it",
         )
-    if fileapi.read_reply(build_dir) is None:
+    if fileapi.read_reply(fileapi.reply_dir(build_dir)) is None:
         return Finding(
             check="target graph",
             status=WARNING,

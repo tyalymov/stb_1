@@ -81,22 +81,36 @@ def write_query(build_dir: Path) -> Path:
     return path
 
 
-def read_reply(build_dir: Path) -> Reply | None:
-    """Load the newest reply to our query, if CMake has answered it.
+def reply_dir(build_dir: Path) -> Path:
+    """Where CMake answers File API queries in a build tree.
 
     Args:
         build_dir: The build tree.
 
     Returns:
-        The reply, or ``None`` when there is no reply directory, no index
-        file, or no answer for our client (the tree was generated before the
-        query was written).
+        ``<build>/.cmake/api/v1/reply``, existing or not.
+    """
+    return build_dir / ".cmake" / "api" / "v1" / "reply"
+
+
+def read_reply(reply_dir: Path) -> Reply | None:
+    """Load the newest reply to our query from a reply directory, if CMake answered it.
+
+    The directory is either the tree's own (:func:`reply_dir`) or a copy of
+    it, as a run dump keeps.
+
+    Args:
+        reply_dir: The reply directory.
+
+    Returns:
+        The reply, or ``None`` when the directory does not exist, holds no
+        index file, or no answer for our client (the tree was generated
+        before the query was written).
 
     Raises:
         FileApiError: A reply file exists but is not the JSON the File API
             promises.
     """
-    reply_dir = build_dir / ".cmake" / "api" / "v1" / "reply"
     indexes = sorted(reply_dir.glob("index-*.json")) if reply_dir.is_dir() else []
     if not indexes:
         return None

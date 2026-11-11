@@ -118,7 +118,7 @@ def record(
         OSError: The store cannot be written, or a snippet is already gone.
     """
     build_dir = index.build_dir.resolve()
-    reply = fileapi.read_reply(build_dir)
+    reply = fileapi.read_reply(fileapi.reply_dir(build_dir))
     graph: Graph | None = None
     if reply is None:
         fileapi.write_query(build_dir)

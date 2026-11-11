@@ -12,6 +12,7 @@ from longpole.cmake.fileapi import (
     graph_from_reply,
     query_path,
     read_reply,
+    reply_dir,
     toolchains_from_reply,
     write_query,
 )
@@ -32,7 +33,7 @@ def test_write_query_is_idempotent_and_asks_for_codemodel_and_toolchains(tmp_pat
 
 def test_no_reply_directory_means_no_reply(tmp_path: Path) -> None:
     """A tree that was never generated with our query has nothing to read."""
-    assert read_reply(tmp_path) is None
+    assert read_reply(reply_dir(tmp_path)) is None
 
 
 def _write_reply(build_dir: Path, *, with_client: bool = True) -> Path:
@@ -104,7 +105,7 @@ def _write_reply(build_dir: Path, *, with_client: bool = True) -> Path:
 def test_graph_and_toolchains_from_a_reply(tmp_path: Path) -> None:
     """Targets, edges and compilers come out of the reply files as the model expects."""
     _write_reply(tmp_path)
-    reply = read_reply(tmp_path)
+    reply = read_reply(reply_dir(tmp_path))
     assert reply is not None
 
     graph = graph_from_reply(reply)
@@ -125,13 +126,13 @@ def test_graph_and_toolchains_from_a_reply(tmp_path: Path) -> None:
 def test_reply_for_another_client_only_is_no_reply(tmp_path: Path) -> None:
     """An index that does not mention our client means CMake never saw our query."""
     _write_reply(tmp_path, with_client=False)
-    assert read_reply(tmp_path) is None
+    assert read_reply(reply_dir(tmp_path)) is None
 
 
 def test_unknown_configuration_is_an_error(tmp_path: Path) -> None:
     """Asking for a configuration the codemodel does not have fails by name."""
     _write_reply(tmp_path)
-    reply = read_reply(tmp_path)
+    reply = read_reply(reply_dir(tmp_path))
     assert reply is not None
     with pytest.raises(FileApiError, match="Release"):
         graph_from_reply(reply, configuration="Release")
@@ -141,7 +142,7 @@ def test_broken_reply_file_is_a_file_api_error(tmp_path: Path) -> None:
     """A target file that is not JSON is reported as a File API problem, with the location."""
     reply = _write_reply(tmp_path)
     (reply / "target-app.json").write_text("{not json", encoding="utf-8")
-    loaded = read_reply(tmp_path)
+    loaded = read_reply(reply_dir(tmp_path))
     assert loaded is not None
     with pytest.raises(FileApiError, match="codemodel"):
         graph_from_reply(loaded)
@@ -151,7 +152,7 @@ def test_broken_reply_file_is_a_file_api_error(tmp_path: Path) -> None:
 @pytest.mark.slow
 def test_real_chain_graph_has_the_dependency_chain(built_chain: BuiltChain) -> None:
     """For the chain fixture, every installed CMake reports a <- b <- c and a C compiler."""
-    reply = read_reply(built_chain.project.build_dir)
+    reply = read_reply(reply_dir(built_chain.project.build_dir))
     assert reply is not None
 
     graph = graph_from_reply(reply)
@@ -182,10 +183,10 @@ def test_query_written_after_generate_is_answered_by_the_next_configure(
     """The reply appears only once CMake has generated with the query in place."""
     chain.write_query(InstrumentationQuery(hooks=("postCMakeBuild",), callbacks=(chain.callback,)))
     chain.configure()
-    assert read_reply(chain.build_dir) is None
+    assert read_reply(reply_dir(chain.build_dir)) is None
 
     write_query(chain.build_dir)
-    assert read_reply(chain.build_dir) is None
+    assert read_reply(reply_dir(chain.build_dir)) is None
 
     chain.configure()
-    assert read_reply(chain.build_dir) is not None
+    assert read_reply(reply_dir(chain.build_dir)) is not None

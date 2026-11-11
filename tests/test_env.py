@@ -160,7 +160,7 @@ def test_unconfigured_tree_collects_to_nothing(
 @pytest.mark.slow
 def test_built_tree_collects_cmake_generator_and_toolchain(built_chain: BuiltChain) -> None:
     """A configured tree yields the exact CMake version, its generator and the C compiler."""
-    reply = fileapi.read_reply(built_chain.project.build_dir)
+    reply = fileapi.read_reply(fileapi.reply_dir(built_chain.project.build_dir))
     environment = collect(built_chain.project.build_dir, reply=reply)
     assert environment.cmake_version is not None
     assert environment.cmake_version.startswith(".".join(map(str, built_chain.version)))

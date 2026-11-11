@@ -252,7 +252,7 @@ def test_a_real_capture_round_trips_through_the_store(
     index = snippets.read_index(
         capture.directory / "index.json", data_dir=capture.directory / "snippets"
     )
-    reply = fileapi.read_reply(built_chain.project.build_dir)
+    reply = fileapi.read_reply(fileapi.reply_dir(built_chain.project.build_dir))
     assert reply is not None
     run = Run(
         manifest=Manifest(

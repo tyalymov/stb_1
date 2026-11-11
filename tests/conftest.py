@@ -275,7 +275,7 @@ def chain_run(built_chain: BuiltChain) -> Run:
     index = snippets.read_index(
         capture.directory / "index.json", data_dir=capture.directory / "snippets"
     )
-    reply = fileapi.read_reply(built_chain.project.build_dir)
+    reply = fileapi.read_reply(fileapi.reply_dir(built_chain.project.build_dir))
     assert reply is not None
     return Run(
         manifest=Manifest(
