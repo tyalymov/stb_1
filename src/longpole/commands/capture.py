@@ -61,7 +61,7 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
 
     Args:
         index: Index file; CMake appends it to the callback.
-        label: Label the run; may be repeated (a CI run id is added automatically).
+        label: Label the run; may be repeated.
         store: Run store to write to instead of the resolved one.
 
     Returns:
@@ -80,11 +80,7 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
     if not steps:
         output.stderr(f"longpole: {parsed.hook}: empty index, nothing recorded")
         return 0
-    labels = list(label)
-    ci_run_id = os.environ.get("GITHUB_RUN_ID")  # set by GitHub Actions
-    if ci_run_id:
-        labels.append(f"ci:{ci_run_id}")
-    outcome = record(parsed, steps, store_override=store, environ=os.environ, labels=tuple(labels))
+    outcome = record(parsed, steps, store_override=store, environ=os.environ, labels=label)
     output.stderr(status_line(outcome))
     return 0
 

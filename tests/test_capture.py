@@ -31,7 +31,7 @@ def _instrument(project: CMakeProject, store: Path, *hooks: str, label: str | No
     callback = f"{sys.executable} -m longpole capture"
     if label is not None:
         callback += f" --label {label}"
-    project.set_env(LONGPOLE_STORE=str(store), GITHUB_RUN_ID="4242")
+    project.set_env(LONGPOLE_STORE=str(store))
     project.write_query(
         InstrumentationQuery(
             hooks=hooks,
@@ -96,7 +96,7 @@ def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
     assert _roles(store, "postCTest") == {"ctest": 1}
 
     build_run = _newest(store, "postCMakeBuild")
-    assert build_run.manifest.labels == ("nightly", "ci:4242")
+    assert build_run.manifest.labels == ("nightly",)
     assert store.read("label:nightly").manifest.hook == "postCTest", "label: picks the newest"
     assert build_run.manifest.build_dir == str(project.build_dir.resolve())
     expected_minor = {3: 0, 4: 1, 5: 2}[cmake_version_of(cmake_binary)[1]]
