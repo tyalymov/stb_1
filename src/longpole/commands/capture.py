@@ -63,12 +63,12 @@ def capture(
     """
     try:
         document = load_object(index)
+        _warn_unless_valid(document, index)
         fields = Fields(document)
         hook = fields.string("hook")
         build_dir = Path(fields.string("buildDir")).resolve()
         data_dir = Path(fields.string("dataDir"))
         snippets = [data_dir / name for name in fields.strings("snippets")]
-        _warn_unless_valid(document, index)
     except FieldError as exc:
         raise IndexFormatError(f"index file {index}: {exc}; nothing to copy") from exc
 
@@ -109,7 +109,8 @@ def _warn_unless_valid(document: Json, index: Path) -> None:
 
     A CMake newer than the schema writes a data minor the schema forbids.
     The data is stored regardless and read with whatever the reader knows,
-    so the only thing to do here is to say so in the build log.
+    so the only thing to do here is to say so in the build log. The fields
+    the copy needs are read afterwards with their own, fatal, check.
 
     Args:
         document: The parsed index.
