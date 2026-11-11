@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -27,18 +26,19 @@ CAPTURE_HOOKS = [
 """The hooks `enable` asks for."""
 
 
-def _which(found: str | None) -> Callable[[str], str | None]:
-    """A stand-in for ``shutil.which`` that answers the same path for every name.
+def _which(**installed: str) -> Callable[[str], str | None]:
+    """A stand-in for ``shutil.which`` that knows only the given executables.
 
     Args:
-        found: The path to report, or ``None`` for "not installed".
+        **installed: Executable name to the path to report; anything else is
+            "not installed".
 
     Returns:
         The replacement function.
     """
 
-    def which(_name: str) -> str | None:
-        return found
+    def which(name: str) -> str | None:
+        return installed.get(name)
 
     return which
 
@@ -59,27 +59,27 @@ def test_query_asks_for_process_metrics_only_from_data_1_2() -> None:
     assert old["hooks"] == new["hooks"] == CAPTURE_HOOKS
 
 
-def test_callback_prefers_the_installed_script(monkeypatch: pytest.MonkeyPatch) -> None:
-    """With a `longpole` script on PATH the callback names it by absolute path."""
-    monkeypatch.setattr(shutil, "which", _which("/opt/tools/bin/longpole"))
+def test_callback_names_the_installed_longpole(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The callback names the `longpole` on PATH by absolute path."""
+    monkeypatch.setattr(shutil, "which", _which(longpole="/opt/tools/bin/longpole"))
     assert (
         enable.callback_command(store=Path("/opt/runs"))
         == '"/opt/tools/bin/longpole" capture --store "/opt/runs"'
     )
 
 
-def test_callback_falls_back_to_this_interpreter(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Without a script the callback runs the package through the current Python."""
-    monkeypatch.setattr(shutil, "which", _which(None))
-    assert (
-        enable.callback_command(store=Path("/opt/runs"))
-        == f'"{sys.executable}" -m longpole capture --store "/opt/runs"'
-    )
+def test_without_longpole_on_path_enable_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No installed command to name means nothing to write; the message says how to fix it."""
+    monkeypatch.setattr(shutil, "which", _which())
+    assert main(["enable", str(tmp_path / "build")]) == 1
+    assert "no longpole on PATH" in capsys.readouterr().err
 
 
 def test_labels_and_store_go_into_the_callback(monkeypatch: pytest.MonkeyPatch) -> None:
     """The callback gets nothing from the enabling shell, so labels and the store ride along."""
-    monkeypatch.setattr(shutil, "which", _which("/opt/tools/bin/longpole"))
+    monkeypatch.setattr(shutil, "which", _which(longpole="/opt/tools/bin/longpole"))
     command = enable.callback_command(store=Path("/opt/runs/my store"), labels=("nightly", "ci:42"))
     assert command == (
         '"/opt/tools/bin/longpole" capture --store "/opt/runs/my store" '
@@ -166,8 +166,8 @@ def test_enable_with_label_and_store_records_there_with_the_label(
 def test_missing_cmake_is_a_warning_not_a_refusal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Nothing on PATH: the query is still written, for data version 1.0, with a warning."""
-    monkeypatch.setattr(shutil, "which", _which(None))
+    """No cmake on PATH: the query is still written, for data version 1.0, with a warning."""
+    monkeypatch.setattr(shutil, "which", _which(longpole="/opt/tools/bin/longpole"))
     build = tmp_path / "build"
     assert main(["enable", str(build)]) == 0
     captured = capsys.readouterr()
@@ -190,7 +190,9 @@ def test_old_cmake_is_a_warning_not_a_refusal(
             executable=cmake, version="3.31.9", version_tuple=(3, 31, 9), data_version=None
         )
 
-    monkeypatch.setattr(shutil, "which", _which("/fake/cmake"))
+    monkeypatch.setattr(
+        shutil, "which", _which(cmake="/fake/cmake", longpole="/opt/tools/bin/longpole")
+    )
     monkeypatch.setattr(tooling, "describe", describe)
     assert main(["enable", str(tmp_path / "build")]) == 0
     captured = capsys.readouterr()
