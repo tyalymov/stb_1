@@ -23,7 +23,7 @@ import zstandard
 from longpole.cmake import fileapi, snippets
 from longpole.errors import DumpFormatError
 from longpole.jsonfields import FieldError, Fields, load_object
-from longpole.model import DataVersion, Environment, GitInfo, Manifest, Run
+from longpole.model import Environment, GitInfo, Manifest, Run
 
 MANIFEST = "manifest.json"
 RAW = "raw"
@@ -151,6 +151,7 @@ def read_run(directory: Path, *, reply_from: Path | None = None) -> Run:
     reply = fileapi.read_reply(source) if source is not None else None
     return Run(
         manifest=manifest,
+        data_version=index.version,
         steps=steps,
         graph=fileapi.graph_from_reply(reply) if reply is not None else None,
         toolchains=fileapi.toolchains_from_reply(reply) if reply is not None else (),
@@ -180,7 +181,6 @@ def _manifest(fields: Fields) -> Manifest:
     Raises:
         FieldError: A field is missing or has the wrong type.
     """
-    version = fields.object("data_version")
     return Manifest(
         format_version=fields.integer("format_version"),
         run_id=fields.string("run_id"),
@@ -188,7 +188,6 @@ def _manifest(fields: Fields) -> Manifest:
         tool_version=fields.string("tool_version"),
         hook=fields.string("hook"),
         build_dir=fields.string("build_dir"),
-        data_version=DataVersion(major=version.integer("major"), minor=version.integer("minor")),
         environment=_environment(fields.object("environment")),
         labels=fields.strings("labels"),
     )

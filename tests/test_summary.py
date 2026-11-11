@@ -54,7 +54,13 @@ def test_sources_are_ranked_by_compile_time() -> None:
 def test_empty_run_summarises_to_zeros() -> None:
     """A run without steps has zero totals and empty tables rather than errors."""
     run = sample_run()
-    empty = Run(manifest=run.manifest, steps=(), graph=run.graph, system=run.system)
+    empty = Run(
+        manifest=run.manifest,
+        data_version=run.data_version,
+        steps=(),
+        graph=run.graph,
+        system=run.system,
+    )
     result = summary.summarize(empty)
     assert result.totals == summary.Totals(span_ms=0, busy_ms=0, step_count=0, failed_count=0)
     assert result.phases == ()
@@ -66,7 +72,9 @@ def test_result_detail_reports_the_first_failure() -> None:
     run = sample_run()
     failing = replace(run.steps[1], role="test", test_name="t1", result=3, target=None)
     passing = replace(run.steps[1], role="test", test_name="t2", result=0, target=None)
-    result = summary.summarize(Run(manifest=run.manifest, steps=(failing, passing)))
+    result = summary.summarize(
+        Run(manifest=run.manifest, data_version=run.data_version, steps=(failing, passing))
+    )
     assert [(t.name, t.detail) for t in result.slowest_tests] == [
         ("t1", "failed (exit 3)"),
         ("t2", "passed"),

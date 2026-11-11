@@ -61,7 +61,7 @@ def raw_files(run: Run, directory: Path) -> RawFiles:
     """
     snippet_dir = directory / "snippets"
     snippet_dir.mkdir(parents=True, exist_ok=True)
-    version = run.manifest.data_version
+    version = run.data_version
     paths: list[Path] = []
     for position, step in enumerate(run.steps):
         path = snippet_dir / f"{step.role}-{position:03d}.json"
@@ -247,9 +247,9 @@ def run_from_capture(capture: CapturedIndex, build_dir: Path) -> Run:
             tool_version="test",
             hook=index.hook,
             build_dir=str(index.build_dir),
-            data_version=index.version,
             environment=collect(build_dir),
         ),
+        data_version=index.version,
         steps=snippets.read_steps(index),
         graph=fileapi.graph_from_reply(reply) if reply is not None else None,
         toolchains=fileapi.toolchains_from_reply(reply) if reply is not None else (),
@@ -377,7 +377,6 @@ def sample_run(
         tool_version="0.0.1.dev0",
         hook="postCMakeBuild",
         build_dir=build_dir,
-        data_version=DataVersion(major=1, minor=2),
         environment=Environment(
             cmake_version="4.5.0",
             generator="Ninja",
@@ -389,6 +388,7 @@ def sample_run(
     )
     return Run(
         manifest=manifest,
+        data_version=DataVersion(major=1, minor=2),
         steps=tuple(steps),
         graph=graph if with_graph else None,
         toolchains=(

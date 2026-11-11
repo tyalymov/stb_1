@@ -54,10 +54,9 @@ def _run(*steps: Step) -> Run:
         tool_version="0.0.1.dev0",
         hook="postCMakeBuild",
         build_dir="/tmp/build",
-        data_version=DataVersion(major=1, minor=2),
         environment=Environment(cmake_version=None, generator=None, cpu_count=None, git=None),
     )
-    return Run(manifest=manifest, steps=steps)
+    return Run(manifest=manifest, data_version=DataVersion(major=1, minor=2), steps=steps)
 
 
 def test_data_version_prints_like_cmake() -> None:

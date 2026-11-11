@@ -293,7 +293,6 @@ def test_a_real_capture_round_trips_through_the_store(
         tool_version="test",
         hook=index.hook,
         build_dir=str(index.build_dir),
-        data_version=index.version,
         environment=collect(built_chain.project.build_dir),
         labels=("test",),
     )
@@ -312,7 +311,7 @@ def test_a_real_capture_round_trips_through_the_store(
     assert sorted(target.name for target in loaded.graph.targets) == ["a", "b", "c"]
     assert [toolchain.language for toolchain in loaded.toolchains] == ["C"]
     assert loaded.system == index.system
-    assert loaded.manifest.data_version == DataVersion(
+    assert loaded.data_version == DataVersion(
         major=1, minor={3: 0, 4: 1, 5: 2}[built_chain.version[1]]
     )
     dump_dir = store.runs_dir / manifest.run_id

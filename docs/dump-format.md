@@ -29,7 +29,6 @@ random hex digits.
 | `tool_version` | string | longpole version that wrote the dump. |
 | `hook` | string | CMake hook that produced the index (`postGenerate`, `postCMakeBuild`, `postCTest`, ...). |
 | `build_dir` | string | Build tree from the index, with symlinks resolved (`/private/var/...` rather than `/var/...` on macOS). |
-| `data_version` | object | `{"major": 1, "minor": N}`; N is 0 for CMake 4.3, 1 for 4.4, 2 for 4.5. |
 | `environment` | object | See below. |
 | `labels` | array of strings | What `enable --label` gave the callback. |
 
@@ -50,9 +49,11 @@ instrumentation API (`Help/manual/cmake-instrumentation.7.rst` in the CMake
 sources). Snippet paths inside the copied index still name CMake's data
 directory; readers resolve them against `raw/snippets/` instead.
 
-Reading does not validate against the vendored schema. A CMake newer than the
-reader writes fields the schema forbids, and the point of keeping raw files is
-that such a dump still reads: unknown snippet fields land in `Step.extra`.
+The callback checks the index against the vendored schema and only warns on
+a mismatch; reading validates nothing. A CMake newer than the reader writes
+fields and versions the schema forbids, and the point of keeping raw files is
+that such a dump is still stored and still reads: unknown snippet fields land
+in `Step.extra`.
 
 ## raw/fileapi/
 

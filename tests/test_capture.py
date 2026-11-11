@@ -101,7 +101,7 @@ def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
     assert store.read("label:nightly").manifest.hook == "postCTest", "label: picks the newest"
     assert build_run.manifest.build_dir == str(project.build_dir.resolve())
     expected_minor = {3: 0, 4: 1, 5: 2}[cmake_version_of(cmake_binary)[1]]
-    assert build_run.manifest.data_version.minor == expected_minor
+    assert build_run.data_version.minor == expected_minor
     assert build_run.graph is not None, "borrowed from the postGenerate run"
     assert sorted(target.name for target in build_run.graph.targets) == ["a", "b", "c"]
     assert build_run.manifest.environment.generator == "Ninja"
@@ -184,6 +184,54 @@ def test_empty_index_records_nothing(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert capsys.readouterr().err.splitlines() == [
         "longpole: postCMakeWorkflow: empty index, nothing recorded"
     ]
+
+
+def test_index_of_a_newer_data_version_is_stored_with_a_warning(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Data the vendored schema does not know is copied anyway, with a warning in the log."""
+    build = tmp_path / "build"
+    data = build / ".cmake" / "instrumentation" / "v1" / "data"
+    data.mkdir(parents=True)
+    snippet = data / "configure-1.json"
+    snippet.write_text(
+        json.dumps(
+            {
+                "version": {"major": 1, "minor": 3},
+                "role": "configure",
+                "command": "cmake -S . -B build",
+                "workingDir": str(build),
+                "result": 0,
+                "timeStart": 1_700_000_000_000,
+                "duration": 10,
+                "fieldFromTheFuture": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    index = data / "index-1.json"
+    index.write_text(
+        json.dumps(
+            {
+                "version": {"major": 1, "minor": 3},
+                "buildDir": str(build),
+                "dataDir": str(data),
+                "hook": "postGenerate",
+                "snippets": [snippet.name],
+            }
+        ),
+        encoding="utf-8",
+    )
+    store_dir = tmp_path / "store"
+    assert main(["capture", str(index), "--store", str(store_dir)]) == 0
+    err = capsys.readouterr().err
+    assert "WARNING: index file" in err and "stored anyway" in err
+    assert "recorded as" in err
+
+    run = RunStore(store_dir).read("latest")
+    assert run.data_version.minor == 3
+    assert [step.role for step in run.steps] == ["configure"]
+    assert run.steps[0].extra == {"fieldFromTheFuture": True}
 
 
 @pytest.mark.cmake

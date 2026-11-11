@@ -286,6 +286,7 @@ def _manifest_document(loaded: Run) -> dict[str, object]:
         A JSON-ready object.
     """
     document: dict[str, object] = asdict(loaded.manifest)
+    document["data_version"] = asdict(loaded.data_version)
     document["steps"] = len(loaded.steps)
     document["has_graph"] = loaded.graph is not None
     return document
@@ -307,7 +308,7 @@ def _manifest_table(loaded: Run) -> str:
         ("captured", manifest.created_at),
         ("hook", manifest.hook),
         ("build dir", manifest.build_dir),
-        ("data version", str(manifest.data_version)),
+        ("data version", str(loaded.data_version)),
         ("cmake", environment.cmake_version or ""),
         ("generator", environment.generator or ""),
         ("cores", str(environment.cpu_count) if environment.cpu_count is not None else ""),

@@ -336,7 +336,6 @@ class Manifest:
         build_dir: Build tree the data came from, with symlinks resolved so
             two spellings of one directory compare equal (``/var`` and
             ``/private/var`` on macOS).
-        data_version: Version of the instrumentation data.
         environment: Machine and checkout state.
         labels: Free-form tags, e.g. ``ci:<run id>`` or a user label.
     """
@@ -347,7 +346,6 @@ class Manifest:
     tool_version: str
     hook: str
     build_dir: str
-    data_version: DataVersion
     environment: Environment
     labels: tuple[str, ...] = ()
 
@@ -358,6 +356,7 @@ class Run:
 
     Attributes:
         manifest: Capture metadata.
+        data_version: Version of the instrumentation data, from the index.
         steps: Every step the index listed, in index order.
         graph: Target dependency graph, or ``None`` when no File API reply
             describes the tree as it was for this run.
@@ -367,6 +366,7 @@ class Run:
     """
 
     manifest: Manifest
+    data_version: DataVersion
     steps: tuple[Step, ...]
     graph: Graph | None = None
     toolchains: tuple[Toolchain, ...] = ()
