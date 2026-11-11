@@ -24,7 +24,7 @@ from longpole.cmake import fileapi
 from longpole.cmake.schema import validate
 from longpole.commands.options import Store
 from longpole.errors import IndexFormatError, SchemaError
-from longpole.jsonfields import FieldError, Fields, load_object
+from longpole.jsonfields import FieldError, Fields, Json, load_object
 from longpole.model import Manifest
 from longpole.store import RunStore, new_run_id, resolve_store
 
@@ -59,14 +59,9 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
         build_dir = Path(fields.string("buildDir")).resolve()
         data_dir = Path(fields.string("dataDir"))
         snippets = [data_dir / name for name in fields.strings("snippets")]
+        _warn_unless_valid(document, index)
     except FieldError as exc:
         raise IndexFormatError(f"index file {index}: {exc}; nothing to copy") from exc
-    try:
-        validate("index", document, source=str(index))
-    except SchemaError as exc:
-        # A CMake newer than this longpole's schema is the likely cause; the
-        # data is stored regardless and read with whatever the reader knows.
-        log.warning("%s; stored anyway", exc)
 
     if not snippets:
         output.stderr(f"longpole: {hook}: empty index, nothing recorded")
@@ -98,3 +93,20 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
         f"{count} snippet{'s' if count != 1 else ''} (longpole analyze)"
     )
     return 0
+
+
+def _warn_unless_valid(document: Json, index: Path) -> None:
+    """Check the index against the vendored schema; a mismatch is a warning, not a refusal.
+
+    A CMake newer than the schema writes a data minor the schema forbids.
+    The data is stored regardless and read with whatever the reader knows,
+    so the only thing to do here is to say so in the build log.
+
+    Args:
+        document: The parsed index.
+        index: Its path, for the message.
+    """
+    try:
+        validate("index", document, source=str(index))
+    except SchemaError as exc:
+        log.warning("%s; stored anyway", exc)
