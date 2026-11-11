@@ -105,7 +105,7 @@ def test_enable_writes_query_graph_request_and_store_marker(
     assert (build / IN_TREE).is_dir()
 
     out = capsys.readouterr().out
-    assert out.startswith(f"enabled (tree): {query}")
+    assert out.startswith(f"enabled: {query}")
     assert "run cmake again" not in out
 
 
@@ -122,7 +122,6 @@ def test_enable_is_idempotent_and_json_reports_the_same_paths(
     assert main(["enable", str(build), "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert Path(report["query"]).read_bytes() == first
-    assert report["scope"] == "tree"
     assert report["regenerate_needed"] is False
     assert report["file_api_query"] == str(fileapi.query_path(build))
 
@@ -142,22 +141,6 @@ def test_disable_deletes_the_queries_but_keeps_the_store(
     assert capsys.readouterr().out.splitlines()[-1] == f"removed {query}"
 
     assert main(["disable", str(build)]) == 0
-
-
-@pytest.mark.cmake
-def test_global_writes_to_cmake_config_dir(
-    tmp_path: Path,
-    cmake_on_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """--global writes where `cmake --print-config-dir` points, which honours CMAKE_CONFIG_DIR."""
-    monkeypatch.setenv("CMAKE_CONFIG_DIR", str(tmp_path / "config"))
-    assert main(["enable", "--global"]) == 0
-    query = tmp_path / "config" / "instrumentation" / "v1" / "query" / "longpole.json"
-    assert query.is_file()
-    assert capsys.readouterr().out.startswith(f"enabled (global): {query}")
-    assert not (tmp_path / "config" / ".cmake").exists()
 
 
 @pytest.mark.cmake
@@ -207,7 +190,7 @@ def test_missing_cmake_is_a_warning_not_a_refusal(
     assert main(["enable", str(build)]) == 0
     captured = capsys.readouterr()
     assert "WARNING: no cmake on PATH" in captured.err
-    assert captured.out.startswith("enabled (tree): ")
+    assert captured.out.startswith("enabled: ")
     document = json.loads(
         (build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json").read_text()
     )
@@ -230,13 +213,4 @@ def test_old_cmake_is_a_warning_not_a_refusal(
     assert main(["enable", str(tmp_path / "build")]) == 0
     captured = capsys.readouterr()
     assert "WARNING: cmake on PATH is 3.31.9, older than 4.3" in captured.err
-    assert captured.out.startswith("enabled (tree): ")
-
-
-def test_global_without_cmake_is_an_error(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """--global needs cmake to say where the user-level directory is; without it, exit code 1."""
-    monkeypatch.setattr(shutil, "which", _which(None))
-    assert main(["enable", "--global"]) == 1
-    assert "no cmake on PATH" in capsys.readouterr().err
+    assert captured.out.startswith("enabled: ")

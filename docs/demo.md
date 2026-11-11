@@ -27,7 +27,7 @@ cd docs && vhs demo.tape    # writes demo.gif next to it
 ```
 
 The tape copies the fixture into a temporary directory and sets
-`CMAKE_CONFIG_DIR` there, so a `--global` query on the recording machine does
+`CMAKE_CONFIG_DIR` there, so a user-level query on the recording machine does
 not leak into the demo and the demo does not leave a query behind.
 
 Keep the GIF under a couple of megabytes: 100 columns, 30 rows, a 1.5 s pause

@@ -37,9 +37,7 @@ builds. `longpole doctor` checks both.
 Turn recording on once, then build as you always do:
 
 ```sh
-longpole enable --global     # every CMake build of this user on this machine
-# or, for one build tree, before you configure it:
-longpole enable build
+longpole enable build        # before you configure the tree
 
 cmake -S . -B build -G Ninja
 cmake --build build
@@ -179,9 +177,7 @@ and git state at capture time; and the raw files CMake wrote, so a newer
 longpole can re-read an old run. The layout is described in
 [docs/dump-format.md](docs/dump-format.md).
 
-Runs live in `<build>/.longpole/` for a tree you enabled, or in your user
-data directory for `--global` (`~/.local/share/longpole` on Linux,
-`~/Library/Application Support/longpole` on macOS). `--store PATH` or
+Runs live in `<build>/.longpole/` of the tree you enabled. `--store PATH` or
 `LONGPOLE_STORE` points everything at another directory. `enable --store
 PATH` and `enable --label NAME` are written into the callback itself, so a
 CI job can say once where its runs go and how they are tagged:
@@ -202,9 +198,8 @@ longpole enable build --store "$RUNNER_TEMP/longpole" --label "ci:$GITHUB_RUN_ID
   step until you run `cmake` on it again; `doctor` tells you when that is
   the case, and so does the status line.
 - The critical path needs the target graph, which CMake writes at configure
-  time when asked. `enable build` asks before the first configure. With
-  `--global`, the first build of a tree has no graph and the status line
-  says so; the next configure fixes it for good.
+  time when asked. `enable build` asks; a tree enabled after its configure
+  has no graph until the next one, and the status line says so.
 - Within a target, compile steps and independent custom commands are taken
   to run in parallel and link steps one after another. That is exact for
   the usual shapes and never worse than the sum of the target's steps.

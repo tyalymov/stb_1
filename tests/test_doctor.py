@@ -75,7 +75,7 @@ def test_unconfigured_tree_without_query_needs_enable(
     assert findings["cmake"]["status"] == doctor.OK
     assert findings["build tree"]["status"] == doctor.WARNING
     assert findings["query"]["status"] == doctor.PROBLEM
-    assert report["actions"] == [f"run `longpole enable {build}` or `longpole enable --global`"]
+    assert report["actions"] == [f"run `longpole enable {build}`"]
 
 
 @pytest.mark.cmake

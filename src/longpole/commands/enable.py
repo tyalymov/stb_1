@@ -1,18 +1,17 @@
-"""``longpole enable``: switch CMake's instrumentation on, for one build tree or for everything.
+"""``longpole enable``: switch CMake's instrumentation on for a build tree.
 
-CMake records a build when a query file sits in one of two places: inside
-the build tree (``<build>/.cmake/instrumentation/v1/query/``) or in the
-user's CMake configuration directory, which applies to every build on the
-machine. This command writes one query file there, naming ``longpole
-capture`` as the callback, and nothing else: no change to the project, no
-wrapper around the build. CMake calls the callback after each configure,
-build, install, workflow and ctest run, and the callback stores the run.
+CMake records a build when a query file sits in
+``<build>/.cmake/instrumentation/v1/query/``. This command writes one query
+file there, naming ``longpole capture`` as the callback, and nothing else:
+no change to the project, no wrapper around the build. CMake calls the
+callback after each configure, build, install, workflow and ctest run, and
+the callback stores the run.
 
-For a build tree the command also plants a File API query, so the next
-configure answers with the target graph the critical path needs, and marks
-the tree as having its own run store. A tree that was configured before the
-query existed has to be configured once more: the launcher that records
-each step is written into the build system at generate time.
+The command also plants a File API query, so the next configure answers
+with the target graph the critical path needs, and marks the tree as having
+its own run store. A tree that was configured before the query existed has
+to be configured once more: the launcher that records each step is written
+into the build system at generate time.
 """
 
 from __future__ import annotations
@@ -23,14 +22,11 @@ import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
-
-from cyclopts import Parameter
 
 from longpole import output
 from longpole.cmake import fileapi, tooling
 from longpole.commands.options import Output, Store
-from longpole.errors import CMakeToolError, UsageError
+from longpole.errors import CMakeToolError
 from longpole.model import DataVersion
 from longpole.store import IN_TREE
 
@@ -42,43 +38,37 @@ class EnableResult:
     """What the command did, for the text and JSON reports.
 
     Attributes:
-        scope: ``tree`` or ``global``.
         query: Path of the query file written.
         callback: Command line CMake will run.
-        file_api_query: File API query file written for a build tree, or
-            ``None`` in global mode, where there is no tree to put it in.
+        file_api_query: File API query file written next to it.
         regenerate_needed: The tree is already configured, so the query takes
             full effect only after the next ``cmake`` run.
     """
 
-    scope: str
     query: Path
     callback: str
-    file_api_query: Path | None
+    file_api_query: Path
     regenerate_needed: bool
 
 
 def enable(
-    build_dir: Path | None = None,
+    build_dir: Path,
     /,
     *,
-    everywhere: Annotated[bool, Parameter(name="--global")] = False,
     label: tuple[str, ...] = (),
     store: Store = None,
     output_format: Output = "text",
 ) -> int:
-    """Switch CMake instrumentation on for a build tree, or for every build with --global.
+    """Switch CMake instrumentation on for a build tree.
 
     Write the query file that makes CMake record every step and call
-    'longpole capture' afterwards. With a build tree, also ask the File API
-    for the target graph and mark the tree as having its own run store.
-    Labels and a store given here are written into the callback, so every
-    run it records carries them. Nothing in the project changes.
-    'longpole disable' undoes it.
+    'longpole capture' afterwards, ask the File API for the target graph,
+    and mark the tree as having its own run store. Labels and a store given
+    here are written into the callback, so every run it records carries
+    them. Nothing in the project changes. 'longpole disable' undoes it.
 
     Args:
         build_dir: Build tree to instrument; may not exist yet.
-        everywhere: Instrument every build of this user on this machine instead.
         label: Label every recorded run; may be repeated.
         store: Run store the callback writes to; without it, the tree's own store.
         output_format: text, or json for a program.
@@ -87,33 +77,28 @@ def enable(
         0 on success; failures raise.
 
     Raises:
-        UsageError: Neither a build tree nor ``--global`` was given, or both were.
-        CMakeToolError: ``--global`` and there is no working ``cmake`` on PATH
-            to ask for its configuration directory.
         OSError: A query directory cannot be created or written.
     """
-    if (build_dir is None) == (not everywhere):
-        raise UsageError("enable: give a build tree or --global, not both and not neither")
     result = write_query(build_dir, labels=label, store=store)
     output.result(result, output_format, text=_describe)
     return 0
 
 
 def write_query(
-    build_dir: Path | None, *, labels: tuple[str, ...] = (), store: Path | None = None
+    build_dir: Path, *, labels: tuple[str, ...] = (), store: Path | None = None
 ) -> EnableResult:
-    """Write the query file for a build tree, or for the user when ``build_dir`` is ``None``.
+    """Write the query file for a build tree.
 
     The ``cmake`` on PATH is asked which data version it writes, so the query
     asks for exactly that (a newer minor than the reader knows is ignored
     whole). No ``cmake``, or one older than 4.3, is a warning, not an error:
     the file is written for data version 1.0 and starts working as soon as a
     CMake that knows the API builds the tree. Writing the same file again is
-    harmless. For a build tree the File API query is planted as well, and
-    the in-tree store directory unless ``store`` points elsewhere.
+    harmless. The File API query is planted as well, and the in-tree store
+    directory unless ``store`` points elsewhere.
 
     Args:
-        build_dir: The tree, or ``None`` for the user-level directory.
+        build_dir: The tree.
         labels: Labels the callback attaches to every run.
         store: Store the callback writes to, or ``None`` for the resolved one.
 
@@ -121,8 +106,6 @@ def write_query(
         What was written.
 
     Raises:
-        CMakeToolError: ``build_dir`` is ``None`` and no ``cmake`` on PATH can
-            say where the user-level directory is.
         OSError: A directory cannot be created or a file written.
     """
     info = _cmake_on_path()
@@ -144,19 +127,14 @@ def write_query(
     query.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     log.info("wrote %s", query)
 
-    file_api_query: Path | None = None
-    regenerate_needed = False
-    if build_dir is not None:
-        file_api_query = fileapi.write_query(build_dir)
-        if store is None:  # an in-tree store would shadow the one the callback writes to
-            (build_dir / IN_TREE).mkdir(parents=True, exist_ok=True)
-        regenerate_needed = (build_dir / "CMakeCache.txt").is_file()
+    file_api_query = fileapi.write_query(build_dir)
+    if store is None:  # an in-tree store would shadow the one the callback writes to
+        (build_dir / IN_TREE).mkdir(parents=True, exist_ok=True)
     return EnableResult(
-        scope="global" if build_dir is None else "tree",
         query=query,
         callback=callback,
         file_api_query=file_api_query,
-        regenerate_needed=regenerate_needed,
+        regenerate_needed=(build_dir / "CMakeCache.txt").is_file(),
     )
 
 
@@ -178,32 +156,16 @@ def _cmake_on_path() -> tooling.CMakeInfo | None:
         return None
 
 
-def query_location(build_dir: Path | None) -> Path:
+def query_location(build_dir: Path) -> Path:
     """Where our query file goes.
 
     Args:
-        build_dir: The tree, or ``None`` for the user-level directory.
+        build_dir: The tree.
 
     Returns:
-        ``<build>/.cmake/instrumentation/v1/query/longpole.json`` for a tree;
-        ``<config dir>/instrumentation/v1/query/longpole.json`` otherwise,
-        where the configuration directory is what ``cmake --print-config-dir``
-        of the ``cmake`` on PATH says.
-
-    Raises:
-        CMakeToolError: Global mode and there is no ``cmake`` on PATH, or it
-            cannot say.
+        ``<build>/.cmake/instrumentation/v1/query/longpole.json``.
     """
-    if build_dir is not None:
-        root = build_dir / ".cmake"
-    else:
-        found = shutil.which("cmake")
-        if found is None:
-            raise CMakeToolError(
-                "no cmake on PATH to ask for the user-level configuration directory"
-            )
-        root = tooling.config_dir(Path(found))
-    return root / "instrumentation" / "v1" / "query" / "longpole.json"
+    return build_dir / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
 
 
 def query_document(data_version: DataVersion, callback: str) -> dict[str, object]:
@@ -293,7 +255,7 @@ def _describe(result: EnableResult) -> str:
     Returns:
         The text.
     """
-    lines = [f"enabled ({result.scope}): {result.query}", f"callback: {result.callback}"]
+    lines = [f"enabled: {result.query}", f"callback: {result.callback}"]
     if result.regenerate_needed:
         lines.append(
             "next: this tree is already configured; run cmake again so the recording "

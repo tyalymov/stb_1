@@ -309,7 +309,7 @@ def _query_finding(build_dir: Path, queries: tuple[Path, ...], config_dir: Path 
             check="query",
             status=PROBLEM,
             detail="no instrumentation query applies to this tree",
-            action=f"run `longpole enable {build_dir}` or `longpole enable --global`",
+            action=f"run `longpole enable {build_dir}`",
         )
     places: list[str] = []
     for query in queries:

@@ -7,10 +7,9 @@ as a run, and shows what actually gated it.
 ╭─ Commands ───────────────────────────────────────────────────────────────────────────────────────╮
 │ analyze      Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.  │
 │ capture      Store the run an instrumentation index describes; CMake runs this at each hook.     │
-│ disable      Switch CMake instrumentation off for a build tree, or for every build with          │
-│              --global.                                                                           │
+│ disable      Switch CMake instrumentation off for a build tree.                                  │
 │ doctor       Check whether a build tree records its builds, and say what to fix if not.          │
-│ enable       Switch CMake instrumentation on for a build tree, or for every build with --global. │
+│ enable       Switch CMake instrumentation on for a build tree.                                   │
 │ export       Write a run as a Perfetto trace or a Markdown snapshot.                             │
 │ runs         List stored runs; 'runs show' prints one, 'runs prune' deletes old ones.            │
 │ --help (-h)  Display this message and exit.                                                      │
