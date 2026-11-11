@@ -33,15 +33,6 @@ from longpole.store import RunStore, new_run_id, resolve_store
 
 log = logging.getLogger(__name__)
 
-NEEDS_RECONFIGURE_LABEL = "needs-reconfigure"
-"""Label of a run whose build system predates the query: steps are missing until a cmake run."""
-
-NO_GRAPH_LABEL = "no-graph"
-"""Label of a run captured before the File API answered; the critical path needs the graph."""
-
-CI_RUN_ID_VARIABLE = "GITHUB_RUN_ID"
-"""Set by GitHub Actions; a run captured under it is labelled ``ci:<id>``."""
-
 
 @dataclass(frozen=True, kw_only=True)
 class Outcome:
@@ -89,7 +80,7 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
         OSError: The store cannot be written.
     """
     labels = list(label)
-    ci_run_id = os.environ.get(CI_RUN_ID_VARIABLE)
+    ci_run_id = os.environ.get("GITHUB_RUN_ID")  # set by GitHub Actions
     if ci_run_id:
         labels.append(f"ci:{ci_run_id}")
     outcome = record(index, store_override=store, environ=os.environ, labels=tuple(labels))
@@ -152,9 +143,9 @@ def record(
 
     all_labels = list(labels)
     if graph is None:
-        all_labels.append(NO_GRAPH_LABEL)
+        all_labels.append("no-graph")  # the critical path needs the graph
     if needs_reconfigure:
-        all_labels.append(NEEDS_RECONFIGURE_LABEL)
+        all_labels.append("needs-reconfigure")  # compile and link steps are missing
 
     moment = now if now is not None else datetime.now(UTC)
     manifest = Manifest(

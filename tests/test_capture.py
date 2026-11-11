@@ -148,16 +148,16 @@ def test_tree_generated_before_the_query_is_labelled_until_reconfigured(
 
     store = RunStore(store_dir)
     half = store.read("latest")
-    assert capture.NEEDS_RECONFIGURE_LABEL in half.manifest.labels
-    assert capture.NO_GRAPH_LABEL in half.manifest.labels
+    assert "needs-reconfigure" in half.manifest.labels
+    assert "no-graph" in half.manifest.labels
     assert [step.role for step in half.steps] == ["cmakeBuild"]
     assert fileapi.query_path(project.build_dir).is_file()
 
     project.configure()
     project.build()
     full = store.read("latest")
-    assert capture.NEEDS_RECONFIGURE_LABEL not in full.manifest.labels
-    assert capture.NO_GRAPH_LABEL not in full.manifest.labels
+    assert "needs-reconfigure" not in full.manifest.labels
+    assert "no-graph" not in full.manifest.labels
     assert full.graph is not None
     assert _roles(store, "postCMakeBuild") == CHAIN_BUILD_ROLES
 
