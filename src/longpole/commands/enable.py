@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -106,18 +105,7 @@ def write_query(
     Raises:
         OSError: A directory cannot be created or a file written.
     """
-    info = _cmake_on_path()
-    data_version = (info.data_version if info is not None else None) or DataVersion(
-        major=1, minor=0
-    )
-    if info is None:
-        log.warning("no cmake on PATH; the query asks for data version 1.0 without process metrics")
-    elif info.data_version is None:
-        log.warning(
-            "cmake on PATH is %s, older than 4.3: it has no instrumentation API and will "
-            "record nothing; the query waits for a newer cmake",
-            info.version,
-        )
+    data_version = _requested_data_version()
     target = store if store is not None else build_dir / IN_TREE
     callback = callback_command(labels=labels, store=target)
     query = query_location(build_dir)
@@ -132,22 +120,30 @@ def write_query(
     return EnableResult(query=query, callback=callback, file_api_query=file_api_query)
 
 
-def _cmake_on_path() -> tooling.CMakeInfo | None:
-    """Describe the ``cmake`` on PATH, the one that will most likely run the build.
+def _requested_data_version() -> DataVersion:
+    """The data version to ask for: what ``cmake`` writes, or 1.0 when it cannot say.
+
+    ``cmake`` is the one on PATH, the one that will most likely run the
+    build. Not having it, or having one older than 4.3, is a warning, not an
+    error: the query is written anyway and starts working as soon as a CMake
+    that knows the API builds the tree.
 
     Returns:
-        Its version facts, or ``None`` when there is no ``cmake`` on PATH or
-        it cannot be run; the caller warns, since the query can be written
-        without it.
+        The version to put in the query.
     """
-    found = shutil.which("cmake")
-    if found is None:
-        return None
     try:
-        return tooling.describe(Path(found))
+        info = tooling.describe(Path("cmake"))
     except CMakeToolError as exc:
-        log.warning("cannot run %s: %s", found, exc)
-        return None
+        log.warning("%s; the query asks for data version 1.0 without process metrics", exc)
+        return DataVersion(major=1, minor=0)
+    if info.data_version is None:
+        log.warning(
+            "cmake is %s, older than 4.3: it has no instrumentation API and will record "
+            "nothing; the query waits for a newer cmake",
+            info.version,
+        )
+        return DataVersion(major=1, minor=0)
+    return info.data_version
 
 
 def query_location(build_dir: Path) -> Path:

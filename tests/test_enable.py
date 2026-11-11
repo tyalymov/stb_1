@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -24,23 +22,6 @@ CAPTURE_HOOKS = [
     "postCTest",
 ]
 """The hooks `enable` asks for."""
-
-
-def _which(**installed: str) -> Callable[[str], str | None]:
-    """A stand-in for ``shutil.which`` that knows only the given executables.
-
-    Args:
-        **installed: Executable name to the path to report; anything else is
-            "not installed".
-
-    Returns:
-        The replacement function.
-    """
-
-    def which(name: str) -> str | None:
-        return installed.get(name)
-
-    return which
 
 
 def test_query_asks_for_process_metrics_only_from_data_1_2() -> None:
@@ -147,11 +128,11 @@ def test_missing_cmake_is_a_warning_not_a_refusal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """No cmake on PATH: the query is still written, for data version 1.0, with a warning."""
-    monkeypatch.setattr(shutil, "which", _which())
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
     build = tmp_path / "build"
     assert main(["enable", str(build)]) == 0
     captured = capsys.readouterr()
-    assert "WARNING: no cmake on PATH" in captured.err
+    assert "WARNING: cannot run cmake" in captured.err
     assert captured.out.startswith("enabled: ")
     document = json.loads(
         (build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json").read_text()
@@ -170,9 +151,8 @@ def test_old_cmake_is_a_warning_not_a_refusal(
             executable=cmake, version="3.31.9", version_tuple=(3, 31, 9), data_version=None
         )
 
-    monkeypatch.setattr(shutil, "which", _which(cmake="/fake/cmake"))
     monkeypatch.setattr(tooling, "describe", describe)
     assert main(["enable", str(tmp_path / "build")]) == 0
     captured = capsys.readouterr()
-    assert "WARNING: cmake on PATH is 3.31.9, older than 4.3" in captured.err
+    assert "WARNING: cmake is 3.31.9, older than 4.3" in captured.err
     assert captured.out.startswith("enabled: ")
