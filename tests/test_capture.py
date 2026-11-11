@@ -10,7 +10,6 @@ import pytest
 
 from longpole.cli import main
 from longpole.cmake import fileapi
-from longpole.commands import capture
 from longpole.model import Run
 from longpole.store import RunStore
 from tests.conftest import cmake_version_of, make_project
@@ -82,8 +81,10 @@ def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
     _instrument(project, store_dir, "postGenerate", "postCMakeBuild", "postCTest", label="nightly")
     fileapi.write_query(project.build_dir)
     project.configure()
-    project.build()
+    built = project.build()
     project.run_ctest()
+    assert "longpole: postCMakeBuild recorded as " in built.stderr
+    assert built.stderr.rstrip().endswith("snippets (longpole analyze)")
 
     store = RunStore(store_dir)
     assert [summary.hook for summary in store.summaries()] == [
@@ -101,7 +102,7 @@ def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
     assert build_run.manifest.build_dir == str(project.build_dir.resolve())
     expected_minor = {3: 0, 4: 1, 5: 2}[cmake_version_of(cmake_binary)[1]]
     assert build_run.manifest.data_version.minor == expected_minor
-    assert build_run.graph is not None
+    assert build_run.graph is not None, "borrowed from the postGenerate run"
     assert sorted(target.name for target in build_run.graph.targets) == ["a", "b", "c"]
     assert build_run.manifest.environment.generator == "Ninja"
     assert build_run.system is not None
@@ -109,6 +110,9 @@ def test_each_hook_becomes_a_run_with_graph_environment_and_labels(
     dump_dir = store.resolve(build_run.manifest.run_id)
     assert (dump_dir / "raw" / "index.json").is_file()
     assert len(list((dump_dir / "raw" / "snippets").iterdir())) == sum(CHAIN_BUILD_ROLES.values())
+    assert not (dump_dir / "raw" / "fileapi").exists(), "only a configure copies the reply"
+    configure_dir = store.resolve(_newest(store, "postGenerate").manifest.run_id)
+    assert (configure_dir / "raw" / "fileapi").is_dir()
 
 
 @pytest.mark.cmake
@@ -137,28 +141,25 @@ def capture_hooks() -> tuple[str, ...]:
 
 @pytest.mark.cmake
 @pytest.mark.slow
-def test_tree_generated_before_the_query_is_labelled_until_reconfigured(
+def test_tree_generated_before_the_query_records_only_the_wrapper_until_reconfigured(
     tmp_path: Path, cmake_binary: Path
 ) -> None:
-    """A late query records only cmakeBuild and says so; the next configure makes it whole."""
+    """A late query records only cmakeBuild and no graph; the next configure makes it whole."""
     project = make_project("chain", tmp_path, cmake_binary)
     project.configure()
     store_dir = tmp_path / "store"
     _instrument(project, store_dir, "postGenerate", "postCMakeBuild")
+    fileapi.write_query(project.build_dir)
     project.build()
 
     store = RunStore(store_dir)
     half = store.read("latest")
-    assert "needs-reconfigure" in half.manifest.labels
-    assert "no-graph" in half.manifest.labels
     assert [step.role for step in half.steps] == ["cmakeBuild"]
-    assert fileapi.query_path(project.build_dir).is_file()
+    assert half.graph is None, "no configure was recorded before this build"
 
     project.configure()
     project.build()
     full = store.read("latest")
-    assert "needs-reconfigure" not in full.manifest.labels
-    assert "no-graph" not in full.manifest.labels
     assert full.graph is not None
     assert _roles(store, "postCMakeBuild") == CHAIN_BUILD_ROLES
 
@@ -183,26 +184,6 @@ def test_empty_index_records_nothing(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert capsys.readouterr().err.splitlines() == [
         "longpole: postCMakeWorkflow: empty index, nothing recorded"
     ]
-
-
-def test_status_line_names_the_run_and_the_hints() -> None:
-    """The one stderr line carries the hook, the id, the size and what to do next."""
-    from tests.support.runs import sample_run
-
-    run = sample_run()
-    plain = capture.Outcome(run=run, graph_pending=False, needs_reconfigure=False)
-    assert capture.status_line(plain) == (
-        "longpole: postCMakeBuild recorded as 20261031T120000Z-abc123: 8 steps, 2.4 s, "
-        "critical path 132 ms (5%) (longpole analyze)"
-    )
-    hinted = capture.Outcome(
-        run=sample_run(with_graph=False), graph_pending=True, needs_reconfigure=True
-    )
-    assert capture.status_line(hinted) == (
-        "longpole: postCMakeBuild recorded as 20261031T120000Z-abc123: 8 steps, 2.4 s; "
-        "run cmake again to record compile and link steps; target graph pending next "
-        "configure (longpole analyze)"
-    )
 
 
 @pytest.mark.cmake

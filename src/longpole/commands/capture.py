@@ -2,62 +2,38 @@
 
 CMake calls it with the path of an index file and deletes that index and
 every snippet it lists as soon as all callbacks have returned. So this
-command does one thing, quickly: it reads the index and the snippets, adds
-the target graph from the File API reply, the environment and a few labels,
-writes the whole as a run into the store, and prints one line on standard
-error saying what it stored. Analysis happens later, from the stored run.
+command copies: the index, the snippets and, after a configure, the File
+API reply, plus a manifest with what is only knowable now (time, labels,
+git state, ccache counters). It parses nothing beyond the index's own
+fields and runs no ``cmake``; everything else is derived when a run is
+read. One line on standard error says what was stored.
 
-Two situations get special treatment. An index with no snippets, which the
-``postCMakeWorkflow`` hook produces because the per-step hooks consumed
-everything already, records nothing. An index from a tree that was generated
-before the query existed carries only the ``cmakeBuild`` wrapper step; the
-run is stored but labelled, and the status line asks for a reconfigure.
+An index with no snippets, which the ``postCMakeWorkflow`` hook produces
+because the per-step hooks consumed everything already, records nothing.
 """
 
 from __future__ import annotations
 
 import logging
-import os
-from collections.abc import Mapping
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from longpole import __version__, env, output, units
-from longpole.analyzers.critical_path import CriticalPath, critical_path
-from longpole.cmake import fileapi, snippets, tooling
+from longpole import __version__, env, output
+from longpole.cmake import fileapi, snippets
 from longpole.commands.options import Store
-from longpole.errors import CMakeToolError
-from longpole.model import Graph, Manifest, Run, Step
+from longpole.model import Manifest
 from longpole.store import RunStore, new_run_id, resolve_store
 
 log = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, kw_only=True)
-class Outcome:
-    """What one callback invocation stored.
-
-    Attributes:
-        run: The stored run.
-        graph_pending: No File API reply existed; the query was planted for
-            the next configure.
-        needs_reconfigure: The build system predates the query, so compile,
-            link and custom steps are missing from this run.
-    """
-
-    run: Run
-    graph_pending: bool
-    needs_reconfigure: bool
-
-
 def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None) -> int:
     """Store the run an instrumentation index describes; CMake runs this at each hook.
 
-    Read a CMake instrumentation index and its snippets, add the target graph
-    and the environment, and write the run to the store before CMake deletes
-    the data. Registered as the callback by 'longpole enable'; rarely run by
-    hand. One status line goes to standard error.
+    Copy a CMake instrumentation index, its snippets and, after a configure,
+    the File API reply into the store before CMake deletes the data.
+    Registered as the callback by 'longpole enable'; rarely run by hand.
+    One status line goes to standard error.
 
     Args:
         index: Index file; CMake appends it to the callback.
@@ -70,138 +46,38 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
     Raises:
         FileNotFoundError: The index or a snippet is already gone.
         IndexFormatError: The index is not v1 data.
-        SnippetFormatError: A snippet is not v1 data.
-        SchemaError: The index or a snippet violates the published schema.
-        FileApiError: A File API reply exists but cannot be read.
         OSError: The store cannot be written.
     """
-    parsed = snippets.read_index(index)
-    steps = snippets.read_steps(parsed)
-    if not steps:
+    parsed = snippets.read_index(index, validate_schema=False)
+    if not parsed.snippet_paths:
         output.stderr(f"longpole: {parsed.hook}: empty index, nothing recorded")
         return 0
-    outcome = record(parsed, steps, store_override=store, environ=os.environ, labels=label)
-    output.stderr(status_line(outcome))
-    return 0
 
-
-def record(
-    index: snippets.Index,
-    steps: tuple[Step, ...],
-    *,
-    store_override: Path | None,
-    environ: Mapping[str, str],
-    labels: tuple[str, ...] = (),
-    now: datetime | None = None,
-) -> Outcome:
-    """Turn one index and its steps into a stored run.
-
-    Resolves the build tree, loads the File API reply (or plants the query
-    when there is none), collects the environment, checks whether the build
-    system predates the query, and writes the run. The raw index and snippets
-    are copied into the dump before this function returns, since CMake
-    deletes them afterwards.
-
-    Args:
-        index: The index, already read.
-        steps: Its steps, at least one.
-        store_override: ``--store``, if given.
-        environ: Environment variables, for the store rule.
-        labels: Labels to attach besides the automatic ones.
-        now: Capture time; defaults to the current UTC time.
-
-    Returns:
-        What was stored.
-
-    Raises:
-        FileApiError: A File API reply exists but cannot be read.
-        OSError: The store cannot be written, or a snippet is already gone.
-    """
-    build_dir = index.build_dir.resolve()
-    reply = fileapi.read_reply(fileapi.reply_dir(build_dir))
-    graph: Graph | None = None
-    if reply is None:
-        fileapi.write_query(build_dir)
-        log.info("no File API reply in %s; query planted for the next configure", build_dir)
-    else:
-        graph = fileapi.graph_from_reply(reply)
-    environment = env.collect(build_dir, reply=reply)
-    needs_reconfigure = _generated_before_query(build_dir)
-
-    all_labels = list(labels)
-    if graph is None:
-        all_labels.append("no-graph")  # the critical path needs the graph
-    if needs_reconfigure:
-        all_labels.append("needs-reconfigure")  # compile and link steps are missing
-
-    moment = now if now is not None else datetime.now(UTC)
+    build_dir = parsed.build_dir.resolve()
+    now = datetime.now(UTC)
     manifest = Manifest(
-        run_id=new_run_id(moment),
-        created_at=moment.isoformat(),
+        run_id=new_run_id(now),
+        created_at=now.isoformat(),
         tool_version=__version__,
-        hook=index.hook,
+        hook=parsed.hook,
         build_dir=str(build_dir),
-        data_version=index.version,
-        environment=environment,
-        labels=tuple(all_labels),
+        data_version=parsed.version,
+        environment=env.collect(build_dir),
+        labels=label,
     )
-    captured = Run(manifest=manifest, steps=steps, graph=graph, system=index.system)
-    store = RunStore(resolve_store(store_override, build_dir=build_dir, environ=environ))
-    directory = store.write(captured, raw_index=index.path, raw_snippets=index.snippet_paths)
-    log.info("stored %s as %s", index.hook, directory)
-    return Outcome(run=captured, graph_pending=graph is None, needs_reconfigure=needs_reconfigure)
-
-
-def status_line(outcome: Outcome) -> str:
-    """The one line the callback prints.
-
-    Args:
-        outcome: What :func:`record` did.
-
-    Returns:
-        ``longpole: <hook> recorded as <id>: N steps, 1.6 s, critical path
-        1.2 s (74%)`` plus a hint when the graph is pending or a reconfigure
-        is needed; the critical path part is left out when there is none.
-    """
-    run = outcome.run
-    count = len(run.steps)
-    text = (
-        f"longpole: {run.manifest.hook} recorded as {run.manifest.run_id}: "
-        f"{count} step{'s' if count != 1 else ''}, {units.duration(run.span_ms)}"
+    # The reply is rewritten by every generate, so the copy taken right after
+    # one describes the tree every build until the next configure runs on.
+    reply = fileapi.reply_dir(build_dir)
+    directory = RunStore(resolve_store(store, build_dir=build_dir)).write(
+        manifest,
+        index=index,
+        snippets=parsed.snippet_paths,
+        reply_dir=reply if parsed.hook == "postGenerate" and reply.is_dir() else None,
     )
-    path = critical_path(run)
-    if isinstance(path, CriticalPath):
-        text += f", critical path {units.duration(path.lower_bound_ms)} ({path.share:.0%})"
-    hints: list[str] = []
-    if outcome.needs_reconfigure:
-        hints.append("run cmake again to record compile and link steps")
-    if outcome.graph_pending:
-        hints.append("target graph pending next configure")
-    if hints:
-        text += "; " + "; ".join(hints)
-    return text + " (longpole analyze)"
-
-
-def _generated_before_query(build_dir: Path) -> bool:
-    """Whether the tree's build system is older than the query that produced this index.
-
-    Looks at the tree's own query files and at the user-level ones, found
-    through the ``cmake`` recorded in the cache. A ``cmake`` that cannot be
-    run only drops the user-level check.
-
-    Args:
-        build_dir: The resolved build tree.
-
-    Returns:
-        ``True`` when a reconfigure is needed before steps get recorded.
-    """
-    config_dir: Path | None = None
-    cache = tooling.read_cache(build_dir)
-    if cache.cmake_command is not None:
-        try:
-            config_dir = tooling.config_dir(cache.cmake_command)
-        except CMakeToolError as exc:
-            log.debug("cannot find the user-level query directory: %s", exc)
-    return tooling.generated_before(
-        build_dir, tooling.query_files(build_dir, config_dir=config_dir)
+    log.info("stored %s as %s", parsed.hook, directory)
+    count = len(parsed.snippet_paths)
+    output.stderr(
+        f"longpole: {parsed.hook} recorded as {manifest.run_id}: "
+        f"{count} snippet{'s' if count != 1 else ''} (longpole analyze)"
     )
+    return 0

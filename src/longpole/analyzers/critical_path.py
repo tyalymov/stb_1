@@ -134,8 +134,8 @@ class Unavailable:
 
 
 NO_GRAPH_REASON = (
-    "critical path pending next configure: the run has no target graph because "
-    "no File API reply existed when it was captured"
+    "critical path pending next configure: no configure of this tree was recorded "
+    "before the run, so there is no target graph for it"
 )
 NO_WORK_REASON = (
     "not applicable: no target did measurable work in this run, as in a run of tests only"

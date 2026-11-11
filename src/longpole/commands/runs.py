@@ -17,7 +17,7 @@ from typing import Annotated
 
 from cyclopts import App, Parameter, Token
 
-from longpole import output, units
+from longpole import output
 from longpole.cmake import tooling
 from longpole.commands.options import Output, Store
 from longpole.errors import UsageError
@@ -208,10 +208,12 @@ def _list(
 def _catalogue(summaries: list[RunSummary], one_tree: bool) -> str:
     """The listing as aligned lines.
 
-    A table with eight columns does not fit a terminal without truncating
+    A table with seven columns does not fit a terminal without truncating
     ids or paths, so each run is one line of fixed-width fields, and the
     build directory, when the listing spans several trees, follows on an
     indented line of its own where it can be as long as it needs to be.
+    Durations are not listed: the summary knows only what the callback knew,
+    and it did not parse the snippets.
 
     Args:
         summaries: Runs, oldest first.
@@ -229,7 +231,6 @@ def _catalogue(summaries: list[RunSummary], one_tree: bool) -> str:
             summary.hook.ljust(hook_width),
             (summary.git_sha[:7] if summary.git_sha else "-").ljust(7),
             f"{summary.step_count:>5} steps",
-            units.duration(summary.span_ms).rjust(7),
         ]
         if summary.labels:
             fields.append(", ".join(summary.labels))

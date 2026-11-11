@@ -12,7 +12,7 @@ from longpole.cli import main
 from longpole.exporters import markdown
 from longpole.model import Run, Step
 from longpole.store import RunStore
-from tests.support.runs import sample_run
+from tests.support.runs import sample_run, write_run
 
 
 def test_snapshot_has_headline_sections_and_the_gantt_chart() -> None:
@@ -82,7 +82,7 @@ def test_the_snapshot_shrinks_to_fit_the_limit() -> None:
 def test_export_writes_markdown(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """--markdown PATH writes the snapshot; both formats can go out in one call."""
     store = RunStore(tmp_path / "store")
-    store.write(sample_run())
+    write_run(store, sample_run())
     snapshot = tmp_path / "run.md"
     trace = tmp_path / "trace.json"
     assert (

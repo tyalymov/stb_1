@@ -8,17 +8,33 @@ import pytest
 
 from longpole import dump
 from longpole.errors import DumpFormatError
+from longpole.model import Run
 from longpole.store import RunStore
-from tests.support.runs import sample_run
+from tests.support.runs import raw_files, sample_run, write_run
+
+
+def _dump(run: Run, tmp_path: Path) -> Path:
+    """Write a run's dump under ``tmp_path/source``.
+
+    Args:
+        run: The run.
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        The dump directory, named after the run.
+    """
+    files = raw_files(run, tmp_path / "raw")
+    source = tmp_path / "source" / run.manifest.run_id
+    dump.write_dump(
+        source, run.manifest, index=files.index, snippets=files.snippets, reply_dir=files.reply_dir
+    )
+    return source
 
 
 def test_pack_and_unpack_round_trip(tmp_path: Path) -> None:
     """An archive unpacks to a directory equal to the one packed, including raw files."""
     run = sample_run()
-    source = tmp_path / "source" / run.manifest.run_id
-    index = tmp_path / "index.json"
-    index.write_text("{}", encoding="utf-8")
-    dump.write_run(run, source, raw_index=index)
+    source = _dump(run, tmp_path)
 
     archive = dump.pack(source, tmp_path / "out" / "run.tar.zst")
     assert archive.is_file()
@@ -32,8 +48,7 @@ def test_pack_and_unpack_round_trip(tmp_path: Path) -> None:
 def test_unpack_refuses_to_overwrite_an_existing_run(tmp_path: Path) -> None:
     """A second unpack of the same run into the same place is an error, not a merge."""
     run = sample_run()
-    source = tmp_path / "source" / run.manifest.run_id
-    dump.write_run(run, source)
+    source = _dump(run, tmp_path)
     archive = dump.pack(source, tmp_path / "run.tar.zst")
     dump.unpack(archive, tmp_path / "dest")
     with pytest.raises(FileExistsError):
@@ -62,7 +77,7 @@ def test_store_pack_and_import_move_a_run_between_stores(tmp_path: Path) -> None
     """What one store packs, another imports and indexes like its own run."""
     origin = RunStore(tmp_path / "origin")
     run = sample_run(labels=("baseline",))
-    origin.write(run)
+    write_run(origin, run)
     archive = origin.pack("latest", tmp_path / "transfer")
     assert archive.name == f"{run.manifest.run_id}.tar.zst"
 

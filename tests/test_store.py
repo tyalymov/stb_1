@@ -11,59 +11,94 @@ import pytest
 from longpole import dump
 from longpole.cmake import fileapi, snippets
 from longpole.env import collect
-from longpole.errors import DumpFormatError, UnknownRunError
+from longpole.errors import DumpFormatError, SnippetFormatError, UnknownRunError
 from longpole.model import DataVersion, Manifest, Run
 from longpole.store import IN_TREE, STORE_ENV, RunStore, RunSummary, new_run_id, resolve_store
 from tests.conftest import BuiltChain
-from tests.support.runs import sample_run
+from tests.support.runs import raw_files, sample_run, write_run
+
+
+def _dump(run: Run, tmp_path: Path) -> Path:
+    """Write a run's dump under ``tmp_path/run`` from synthesised raw files.
+
+    Args:
+        run: The run.
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        The dump directory.
+    """
+    files = raw_files(run, tmp_path / "raw")
+    directory = tmp_path / "run"
+    dump.write_dump(
+        directory,
+        run.manifest,
+        index=files.index,
+        snippets=files.snippets,
+        reply_dir=files.reply_dir,
+    )
+    return directory
 
 
 def test_dump_round_trip_preserves_every_field(tmp_path: Path) -> None:
-    """Writing a run and reading it back gives an equal run, optional parts included."""
+    """Raw files written for a run read back as an equal run, optional parts included."""
     run = sample_run()
-    dump.write_run(run, tmp_path / "run")
-    assert dump.read_run(tmp_path / "run") == run
+    assert dump.read_run(_dump(run, tmp_path)) == run
 
 
 def test_dump_layout_matches_the_documented_format(tmp_path: Path) -> None:
-    """The files docs/dump-format.md lists are there, with the documented shapes."""
+    """The files docs/dump-format.md lists are there: a manifest and CMake's own files."""
     run = sample_run(labels=("ci:42",))
-    index = tmp_path / "index.json"
-    index.write_text("{}", encoding="utf-8")
-    snippet = tmp_path / "compile-1.json"
-    snippet.write_text("{}", encoding="utf-8")
-    directory = tmp_path / "run"
-    dump.write_run(run, directory, raw_index=index, raw_snippets=[snippet])
+    directory = _dump(run, tmp_path)
 
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["format_version"] == 1
+    assert manifest["format_version"] == 2
     assert manifest["labels"] == ["ci:42"]
     assert manifest["environment"]["git"]["branch"] == "main"
-    lines = (directory / "steps.jsonl").read_text(encoding="utf-8").splitlines()
-    assert len(lines) == len(run.steps)
-    assert json.loads(lines[1])["process_metrics"]["max_rss_kib"] == 27216
-    assert (directory / "graph.json").is_file()
-    assert (directory / "system.json").is_file()
+    assert sorted(path.name for path in directory.iterdir()) == ["manifest.json", "raw"]
     assert (directory / "raw" / "index.json").is_file()
-    assert (directory / "raw" / "snippets" / "compile-1.json").is_file()
+    assert len(list((directory / "raw" / "snippets").iterdir())) == len(run.steps)
+    assert (directory / "raw" / "fileapi" / "codemodel-v2.json").is_file()
 
 
-def test_optional_files_are_absent_when_the_run_has_no_data(tmp_path: Path) -> None:
-    """A run without graph or system information writes neither file and reads back the same."""
+def test_a_run_without_a_reply_has_no_graph_unless_lent_one(tmp_path: Path) -> None:
+    """Without raw/fileapi the run reads back graphless; a reply directory passed in fills it."""
     run = sample_run(with_graph=False, with_system=False, sha=None)
-    dump.write_run(run, tmp_path / "run")
-    assert not (tmp_path / "run" / "graph.json").exists()
-    assert not (tmp_path / "run" / "system.json").exists()
-    assert dump.read_run(tmp_path / "run") == run
+    directory = _dump(run, tmp_path)
+    assert not (directory / "raw" / "fileapi").exists()
+    assert dump.read_run(directory) == run
+
+    lender = raw_files(sample_run(), tmp_path / "lender")
+    assert lender.reply_dir is not None
+    borrowed = dump.read_run(directory, reply_from=lender.reply_dir)
+    assert borrowed.graph == sample_run().graph
+    assert borrowed.toolchains == sample_run().toolchains
 
 
-def test_broken_steps_line_is_a_dump_format_error(tmp_path: Path) -> None:
-    """A corrupted line is reported with the file name and line number."""
-    dump.write_run(sample_run(), tmp_path / "run")
-    steps = tmp_path / "run" / "steps.jsonl"
-    steps.write_text(steps.read_text(encoding="utf-8") + "{broken\n", encoding="utf-8")
-    with pytest.raises(DumpFormatError, match=r"steps\.jsonl line"):
-        dump.read_run(tmp_path / "run")
+def test_unknown_snippet_fields_survive_a_read(tmp_path: Path) -> None:
+    """A field this longpole does not know lands in Step.extra instead of failing the read."""
+    run = sample_run()
+    loaded = dump.read_run(_dump(run, tmp_path))
+    assert [step.extra for step in loaded.steps if step.extra] == [{"futureField": 2}]
+
+
+def test_broken_snippet_is_a_format_error_naming_the_file(tmp_path: Path) -> None:
+    """A corrupted snippet is reported by name; the dump stays on disk for a fix."""
+    directory = _dump(sample_run(), tmp_path)
+    victim = sorted((directory / "raw" / "snippets").iterdir())[1]
+    victim.write_text("{broken", encoding="utf-8")
+    with pytest.raises(SnippetFormatError, match=victim.name):
+        dump.read_run(directory)
+
+
+def test_broken_manifest_is_a_dump_format_error(tmp_path: Path) -> None:
+    """A manifest with a wrong field type is reported as a dump problem with the location."""
+    directory = _dump(sample_run(), tmp_path)
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    manifest["hook"] = 7
+    (directory / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(DumpFormatError, match="hook"):
+        dump.read_run(directory)
 
 
 def test_run_ids_sort_by_time() -> None:
@@ -106,7 +141,7 @@ def _three_runs(store: RunStore) -> list[Run]:
         ),
     ]
     for run in runs:
-        store.write(run)
+        write_run(store, run)
     return runs
 
 
@@ -115,7 +150,7 @@ def test_store_lists_oldest_first_and_points_latest_at_the_newest(tmp_path: Path
     store = RunStore(tmp_path / "store")
     runs = _three_runs(store)
     assert [s.run_id for s in store.summaries()] == [r.manifest.run_id for r in runs]
-    assert store.summaries()[0] == RunSummary.of(runs[0])
+    assert store.summaries()[0] == RunSummary.of(runs[0].manifest, len(runs[0].steps))
     latest = store.latest()
     assert latest is not None
     assert latest == runs[2]
@@ -183,9 +218,9 @@ def test_list_filters_by_build_dir_and_label(tmp_path: Path) -> None:
 def test_writing_the_same_id_twice_is_refused(tmp_path: Path) -> None:
     """Run ids are unique; a second write with the same id is an error, not an overwrite."""
     store = RunStore(tmp_path / "store")
-    store.write(sample_run())
+    write_run(store, sample_run())
     with pytest.raises(FileExistsError):
-        store.write(sample_run())
+        write_run(store, sample_run())
 
 
 def test_summaries_are_rebuilt_when_the_index_is_damaged(tmp_path: Path) -> None:
@@ -214,8 +249,8 @@ def test_prune_by_age_uses_the_capture_time(tmp_path: Path) -> None:
     store = RunStore(tmp_path / "store")
     old = sample_run(run_id="20250101T000000Z-000001", created_at="2025-01-01T00:00:00+00:00")
     recent = sample_run(run_id="20991231T000000Z-000002", created_at=datetime.now(UTC).isoformat())
-    store.write(old)
-    store.write(recent)
+    write_run(store, old)
+    write_run(store, recent)
     assert store.prune(older_than=timedelta(days=30)) == [old.manifest.run_id]
     assert store.read("latest") == recent
 
@@ -247,39 +282,71 @@ def test_store_resolution_follows_the_documented_precedence(
 def test_a_real_capture_round_trips_through_the_store(
     built_chain: BuiltChain, tmp_path: Path
 ) -> None:
-    """Everything Phase B reads from a real build assembles into a Run that stores and reloads."""
+    """What the callback copies from a real build reads back as a complete run."""
     capture = built_chain.build_capture
     index = snippets.read_index(
         capture.directory / "index.json", data_dir=capture.directory / "snippets"
     )
-    reply = fileapi.read_reply(fileapi.reply_dir(built_chain.project.build_dir))
-    assert reply is not None
-    run = Run(
-        manifest=Manifest(
-            run_id=new_run_id(),
-            created_at=datetime.now(UTC).isoformat(),
-            tool_version="test",
-            hook=index.hook,
-            build_dir=str(index.build_dir),
-            data_version=index.version,
-            environment=collect(built_chain.project.build_dir, reply=reply),
-            labels=("test",),
-        ),
-        steps=snippets.read_steps(index),
-        graph=fileapi.graph_from_reply(reply),
-        system=index.system,
+    manifest = Manifest(
+        run_id=new_run_id(),
+        created_at=datetime.now(UTC).isoformat(),
+        tool_version="test",
+        hook=index.hook,
+        build_dir=str(index.build_dir),
+        data_version=index.version,
+        environment=collect(built_chain.project.build_dir),
+        labels=("test",),
     )
     store = RunStore(tmp_path / "store")
-    store.write(run, raw_index=index.path, raw_snippets=index.snippet_paths)
+    store.write(
+        manifest,
+        index=index.path,
+        snippets=index.snippet_paths,
+        reply_dir=fileapi.reply_dir(built_chain.project.build_dir),
+    )
 
     loaded = store.read("latest")
-    assert loaded == run
+    assert loaded.manifest == manifest
+    assert loaded.steps == snippets.read_steps(index)
+    assert loaded.graph is not None
+    assert sorted(target.name for target in loaded.graph.targets) == ["a", "b", "c"]
+    assert [toolchain.language for toolchain in loaded.toolchains] == ["C"]
+    assert loaded.system == index.system
     assert loaded.manifest.data_version == DataVersion(
         major=1, minor={3: 0, 4: 1, 5: 2}[built_chain.version[1]]
     )
-    assert len(list((store.runs_dir / run.manifest.run_id / "raw" / "snippets").iterdir())) == len(
-        run.steps
+    dump_dir = store.runs_dir / manifest.run_id
+    assert len(list((dump_dir / "raw" / "snippets").iterdir())) == len(loaded.steps)
+    assert (dump_dir / "raw" / "fileapi").is_dir()
+
+
+def test_a_build_borrows_the_graph_from_the_configure_before_it(tmp_path: Path) -> None:
+    """A run without a reply gets the newest earlier reply of its tree, and only its tree."""
+    store = RunStore(tmp_path / "store")
+    configure = sample_run(run_id="20261031T120000Z-000001", created_at="2026-10-31T12:00:00+00:00")
+    build = sample_run(
+        run_id="20261031T120100Z-000002",
+        created_at="2026-10-31T12:01:00+00:00",
+        with_graph=False,
     )
+    elsewhere = sample_run(
+        run_id="20261031T120200Z-000003",
+        created_at="2026-10-31T12:02:00+00:00",
+        build_dir="/elsewhere/build",
+        with_graph=False,
+    )
+    earlier_build = sample_run(
+        run_id="20261031T115900Z-000000",
+        created_at="2026-10-31T11:59:00+00:00",
+        with_graph=False,
+    )
+    for run in (earlier_build, configure, build, elsewhere):
+        write_run(store, run)
+
+    assert store.read(build.manifest.run_id).graph == configure.graph
+    assert store.read(build.manifest.run_id).toolchains == configure.toolchains
+    assert store.read(elsewhere.manifest.run_id).graph is None, "another tree"
+    assert store.read(earlier_build.manifest.run_id).graph is None, "before any configure"
 
 
 def test_runs_captured_within_one_second_keep_capture_order(tmp_path: Path) -> None:
@@ -289,8 +356,8 @@ def test_runs_captured_within_one_second_keep_capture_order(tmp_path: Path) -> N
     earlier = sample_run(
         run_id="20261031T120000Z-zzzzzz", created_at="2026-10-31T12:00:00.100+00:00"
     )
-    store.write(earlier)
-    store.write(later)
+    write_run(store, earlier)
+    write_run(store, later)
     assert [summary.run_id for summary in store.summaries()] == [
         "20261031T120000Z-zzzzzz",
         "20261031T120000Z-aaaaaa",

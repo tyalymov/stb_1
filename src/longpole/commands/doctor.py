@@ -377,8 +377,8 @@ def _graph_finding(build_dir: Path, configured: bool) -> Finding:
         return Finding(
             check="target graph",
             status=WARNING,
-            detail="no File API query yet; the first capture plants one and the next configure "
-            "answers it",
+            detail="no File API query; without it no configure records the target graph",
+            action=f"run `longpole enable {build_dir}`",
         )
     if fileapi.read_reply(fileapi.reply_dir(build_dir)) is None:
         return Finding(

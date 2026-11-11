@@ -46,7 +46,7 @@ cmake --build build
 Each build prints one line on standard error when it finishes:
 
 ```
-longpole: postCMakeBuild recorded as 20261031T140557Z-5d3136: 100 steps, 8.3 s, critical path 8.0 s (96%) (longpole analyze)
+longpole: postCMakeBuild recorded as 20261031T140557Z-5d3136: 100 snippets (longpole analyze)
 ```
 
 Then look at it:
@@ -170,11 +170,13 @@ A run reference is an id or a prefix of one, `latest`, `latest~N`,
 
 ## What a run holds
 
-Every step CMake launched, normalised and kept in order; the target graph
-from CMake's File API, which is what the critical path is computed from;
-the host description CMake recorded; the CMake version, generator, compiler
-and git state at capture time; and the raw files CMake wrote, so a newer
-longpole can re-read an old run. The layout is described in
+The files CMake wrote, unchanged: the index, one snippet per launched step
+and, after a configure, the File API reply the target graph comes from.
+Next to them a manifest with what is only knowable at capture time: the
+hook, the tree, the CMake version and generator, the git state, ccache's
+counters and your labels. The callback copies and stops; parsing happens
+when a run is read, so a dump written by an older longpole still reads with
+a newer one. The layout is described in
 [docs/dump-format.md](docs/dump-format.md).
 
 Runs live in `<build>/.longpole/` of the tree you enabled. `--store PATH` or
@@ -195,11 +197,8 @@ longpole enable build --store "$RUNNER_TEMP/longpole" --label "ci:$GITHUB_RUN_ID
   the command launcher those generators have; Visual Studio and Xcode have
   none, so CMake records nothing there.
 - A tree configured before you ran `enable` records only the outer build
-  step until you run `cmake` on it again; `doctor` tells you when that is
-  the case, and so does the status line.
-- The critical path needs the target graph, which CMake writes at configure
-  time when asked. `enable build` asks; a tree enabled after its configure
-  has no graph until the next one, and the status line says so.
+  step, and no target graph, until you run `cmake` on it again; `doctor`
+  tells you when that is the case, and so does `analyze`.
 - Within a target, compile steps and independent custom commands are taken
   to run in parallel and link steps one after another. That is exact for
   the usual shapes and never worse than the sum of the target's steps.

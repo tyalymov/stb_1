@@ -13,7 +13,7 @@ from longpole.cli import main
 from longpole.exporters import perfetto
 from longpole.model import Run, Step
 from longpole.store import RunStore
-from tests.support.runs import sample_run
+from tests.support.runs import sample_run, write_run
 
 
 def _events(run: Run) -> list[dict[str, object]]:
@@ -120,7 +120,7 @@ def test_overlapping_steps_of_one_kind_take_separate_lanes() -> None:
 def test_export_writes_a_file_or_stdout(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """--perfetto PATH writes the trace; '-' prints it; no format is a usage error."""
     store = RunStore(tmp_path / "store")
-    store.write(sample_run())
+    write_run(store, sample_run())
     target = tmp_path / "trace.json"
 
     assert main(["export", "latest", "--perfetto", str(target), "--store", str(store.root)]) == 0

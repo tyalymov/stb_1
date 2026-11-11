@@ -285,10 +285,11 @@ def chain_run(built_chain: BuiltChain) -> Run:
             hook=index.hook,
             build_dir=str(index.build_dir),
             data_version=index.version,
-            environment=collect(built_chain.project.build_dir, reply=reply),
+            environment=collect(built_chain.project.build_dir),
         ),
         steps=snippets.read_steps(index),
         graph=fileapi.graph_from_reply(reply),
+        toolchains=fileapi.toolchains_from_reply(reply),
         system=index.system,
     )
 

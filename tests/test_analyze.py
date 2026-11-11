@@ -12,7 +12,7 @@ from longpole.cli import main
 from longpole.exporters import terminal
 from longpole.model import Run
 from longpole.store import RunStore
-from tests.support.runs import sample_run
+from tests.support.runs import sample_run, write_run
 
 
 def test_summary_text_has_header_totals_phases_and_targets() -> None:
@@ -51,7 +51,7 @@ def _store_with(tmp_path: Path, *runs: Run) -> Path:
     """
     store = RunStore(tmp_path / "store")
     for run in runs:
-        store.write(run)
+        write_run(store, run)
     return store.root
 
 

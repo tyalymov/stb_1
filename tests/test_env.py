@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-from longpole.cmake import fileapi
 from longpole.env import ccache_stats, collect, cpu_count, git_info, parse_ccache_stats
 from longpole.model import Environment
 from tests.conftest import BuiltChain
@@ -145,26 +144,18 @@ def test_unconfigured_tree_collects_to_nothing(
 ) -> None:
     """A directory with no cache, no repository and no ccache gives an empty environment."""
     monkeypatch.setenv("PATH", "")
-    environment = collect(tmp_path, reply=None)
+    environment = collect(tmp_path)
     assert environment == Environment(
-        cmake_version=None,
-        generator=None,
-        cpu_count=cpu_count(),
-        git=None,
-        toolchains=(),
-        ccache=None,
+        cmake_version=None, generator=None, cpu_count=cpu_count(), git=None, ccache=None
     )
 
 
 @pytest.mark.cmake
 @pytest.mark.slow
-def test_built_tree_collects_cmake_generator_and_toolchain(built_chain: BuiltChain) -> None:
-    """A configured tree yields the exact CMake version, its generator and the C compiler."""
-    reply = fileapi.read_reply(fileapi.reply_dir(built_chain.project.build_dir))
-    environment = collect(built_chain.project.build_dir, reply=reply)
-    assert environment.cmake_version is not None
-    assert environment.cmake_version.startswith(".".join(map(str, built_chain.version)))
+def test_built_tree_collects_cmake_version_and_generator(built_chain: BuiltChain) -> None:
+    """A configured tree yields the CMake version from its cache and the generator."""
+    environment = collect(built_chain.project.build_dir)
+    assert environment.cmake_version == ".".join(map(str, built_chain.version))
     assert environment.generator == "Ninja"
     assert environment.cpu_count is not None
-    assert [toolchain.language for toolchain in environment.toolchains] == ["C"]
     assert environment.git is None

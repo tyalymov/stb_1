@@ -11,7 +11,7 @@ import pytest
 from longpole.cli import main
 from longpole.commands.runs import duration
 from longpole.store import RunStore
-from tests.support.runs import sample_run
+from tests.support.runs import sample_run, write_run
 
 
 def _store(tmp_path: Path) -> Path:
@@ -24,19 +24,21 @@ def _store(tmp_path: Path) -> Path:
         The store directory.
     """
     store = RunStore(tmp_path / "store")
-    store.write(
+    write_run(
+        store,
         sample_run(
             run_id="20261031T120000Z-000001",
             created_at="2026-10-31T12:00:00+00:00",
             build_dir="/elsewhere/build",
-        )
+        ),
     )
-    store.write(
+    write_run(
+        store,
         sample_run(
             run_id="20261031T120100Z-000002",
             created_at="2026-10-31T12:01:00+00:00",
             labels=("ci:42",),
-        )
+        ),
     )
     return store.root
 
@@ -71,13 +73,14 @@ def test_inside_a_tree_only_its_runs_are_listed_unless_all(
     tree.mkdir(parents=True)
     (tree / "CMakeCache.txt").write_text("", encoding="utf-8")
     store = RunStore(tmp_path / "store")
-    store.write(sample_run(run_id="20261031T120000Z-000001", build_dir=str(tree.resolve())))
-    store.write(
+    write_run(store, sample_run(run_id="20261031T120000Z-000001", build_dir=str(tree.resolve())))
+    write_run(
+        store,
         sample_run(
             run_id="20261031T120100Z-000002",
             created_at="2026-10-31T12:01:00+00:00",
             build_dir="/elsewhere/build",
-        )
+        ),
     )
     monkeypatch.chdir(tree)
     assert main(["runs", "--store", str(store.root), "--output-format", "json"]) == 0
@@ -93,16 +96,17 @@ def test_filters_by_label_and_age(
     """--label keeps labelled runs; --since keeps runs captured within the age; bad ages fail."""
     monkeypatch.chdir(tmp_path)
     store = RunStore(tmp_path / "store")
-    store.write(
-        sample_run(run_id="20200101T000000Z-000001", created_at="2020-01-01T00:00:00+00:00")
+    write_run(
+        store, sample_run(run_id="20200101T000000Z-000001", created_at="2020-01-01T00:00:00+00:00")
     )
     fresh = datetime.now(UTC)
-    store.write(
+    write_run(
+        store,
         sample_run(
             run_id=fresh.strftime("%Y%m%dT%H%M%SZ") + "-000002",
             created_at=fresh.isoformat(),
             labels=("ci:42",),
-        )
+        ),
     )
     assert (
         main(["runs", "--label", "ci:42", "--store", str(store.root), "--output-format", "json"])

@@ -2,10 +2,13 @@
 
 A store is a directory with ``runs/<run_id>/`` dumps, a ``runs.jsonl`` of
 one-line summaries for fast listing, and a ``latest`` file naming the newest
-run. There are two kinds of store: one inside a build tree
-(``<build>/.longpole``) and one central per user; :func:`resolve_store`
-picks between them by a fixed rule so every command and the capture callback
-agree without the path being written into any query file.
+run. Usually it lives inside the build tree (``<build>/.longpole``);
+:func:`resolve_store` applies one rule for every command and the callback.
+
+A dump holds raw files and is parsed when read. The target graph of a build
+run comes from the configure before it: a ``postGenerate`` run keeps a copy
+of the File API reply, and :meth:`RunStore.read` finds the newest such copy
+for the same tree captured no later than the run being read.
 
 Runs are addressed by references: a full or prefix id, ``latest``,
 ``latest~N``, ``sha:<prefix>`` of the captured commit, ``label:<name>``, or
@@ -30,7 +33,7 @@ import platformdirs
 from longpole import dump
 from longpole.errors import UnknownRunError
 from longpole.jsonfields import FieldError, Fields, Json
-from longpole.model import Run
+from longpole.model import Manifest, Run
 
 STORE_ENV = "LONGPOLE_STORE"
 """Environment variable naming the store, second in precedence after an explicit path."""
@@ -52,8 +55,7 @@ class RunSummary:
         build_dir: Build tree the run came from.
         git_sha: Commit of the sources, or ``None``.
         labels: The run's labels.
-        step_count: Number of steps.
-        span_ms: Wall-clock span of the steps.
+        step_count: Number of snippets the index listed.
     """
 
     run_id: str
@@ -63,29 +65,45 @@ class RunSummary:
     git_sha: str | None
     labels: tuple[str, ...]
     step_count: int
-    span_ms: int
 
     @classmethod
-    def of(cls, run: Run) -> RunSummary:
-        """Summarise a run.
+    def of(cls, manifest: Manifest, step_count: int) -> RunSummary:
+        """Summarise a run from what the callback knows without parsing snippets.
 
         Args:
-            run: The run.
+            manifest: The run's manifest.
+            step_count: How many snippets its index lists.
 
         Returns:
             Its summary.
         """
-        git = run.manifest.environment.git
+        git = manifest.environment.git
         return cls(
-            run_id=run.manifest.run_id,
-            created_at=run.manifest.created_at,
-            hook=run.manifest.hook,
-            build_dir=run.manifest.build_dir,
+            run_id=manifest.run_id,
+            created_at=manifest.created_at,
+            hook=manifest.hook,
+            build_dir=manifest.build_dir,
             git_sha=git.sha if git is not None else None,
-            labels=run.manifest.labels,
-            step_count=len(run.steps),
-            span_ms=run.span_ms,
+            labels=manifest.labels,
+            step_count=step_count,
         )
+
+    @classmethod
+    def read(cls, directory: Path) -> RunSummary:
+        """Summarise a dump on disk.
+
+        Args:
+            directory: A dump directory.
+
+        Returns:
+            Its summary.
+
+        Raises:
+            DumpFormatError: The manifest is malformed.
+            IndexFormatError: The copied index is not v1 data.
+        """
+        manifest = dump.read_manifest(directory)
+        return cls.of(manifest, len(dump.read_index(directory).snippet_paths))
 
 
 def new_run_id(now: datetime | None = None) -> str:
@@ -168,30 +186,32 @@ class RunStore:
 
     def write(
         self,
-        run: Run,
+        manifest: Manifest,
         *,
-        raw_index: Path | None = None,
-        raw_snippets: Iterable[Path] = (),
+        index: Path,
+        snippets: Iterable[Path],
+        reply_dir: Path | None = None,
     ) -> Path:
-        """Store a run.
+        """Store a run from CMake's files and a manifest.
 
         The dump is written to a temporary directory and renamed into place,
         so a crash mid-write never leaves a half dump under ``runs/``. The
         summary line and the ``latest`` pointer are updated afterwards.
 
         Args:
-            run: The run; its ``manifest.run_id`` becomes the directory name.
-            raw_index: CMake's index file to copy into the dump.
-            raw_snippets: CMake's snippet files to copy into the dump.
+            manifest: What is known about the run; ``run_id`` names the directory.
+            index: CMake's index file.
+            snippets: The snippet files it lists.
+            reply_dir: File API reply directory to keep with the run, if any.
 
         Returns:
             The run's directory.
 
         Raises:
             FileExistsError: A run with that id is already stored.
-            OSError: The store cannot be written.
+            OSError: A file cannot be copied or the store cannot be written.
         """
-        run_id = run.manifest.run_id
+        run_id = manifest.run_id
         final = self.runs_dir / run_id
         if final.exists():
             raise FileExistsError(f"run {run_id} already exists in {self.root}")
@@ -199,10 +219,10 @@ class RunStore:
         staging = self.runs_dir / f".tmp-{run_id}"
         if staging.exists():
             shutil.rmtree(staging)
-        dump.write_run(run, staging, raw_index=raw_index, raw_snippets=raw_snippets)
+        listed = tuple(snippets)
+        dump.write_dump(staging, manifest, index=index, snippets=listed, reply_dir=reply_dir)
         staging.rename(final)
-        with self._summaries_path.open("a", encoding="utf-8") as summaries:
-            summaries.write(json.dumps(asdict(RunSummary.of(run)), sort_keys=True) + "\n")
+        self._append_summary(RunSummary.of(manifest, len(listed)))
         self._write_latest(run_id)
         return final
 
@@ -224,7 +244,7 @@ class RunStore:
             # ValueError covers json.JSONDecodeError: a half-written line.
             summaries = None
         if summaries is None:
-            summaries = [RunSummary.of(dump.read_run(path)) for path in self._run_dirs()]
+            summaries = [RunSummary.read(path) for path in self._run_dirs()]
             self._rewrite_summaries(summaries)
         return sorted(summaries, key=lambda summary: (summary.created_at, summary.run_id))
 
@@ -302,7 +322,7 @@ class RunStore:
         raise UnknownRunError(f"{ref!r} is ambiguous: {', '.join(m.run_id for m in matches)}")
 
     def read(self, ref: str) -> Run:
-        """Load the run a reference names.
+        """Load and parse the run a reference names, graph included when one applies.
 
         Args:
             ref: Any reference :meth:`resolve` accepts.
@@ -312,9 +332,39 @@ class RunStore:
 
         Raises:
             UnknownRunError: The reference names no single run.
-            DumpFormatError: The dump on disk is malformed.
+            DumpFormatError: The manifest on disk is malformed.
+            IndexFormatError: The copied index is not v1 data.
+            SnippetFormatError: A copied snippet is not v1 data.
+            FileApiError: The File API reply that applies cannot be read.
         """
-        return dump.read_run(self.resolve(ref))
+        directory = self.resolve(ref)
+        manifest = dump.read_manifest(directory)
+        return dump.read_run(directory, reply_from=self.reply_for(manifest))
+
+    def reply_for(self, manifest: Manifest) -> Path | None:
+        """The File API reply describing the tree as it was for a run.
+
+        A configure copies the reply into its own dump; a build does not,
+        because the launcher that records its steps was written into the
+        build system by that configure, and the graph did not change since.
+        So the newest dump of the same tree captured no later than the run,
+        holding a reply, is the one.
+
+        Args:
+            manifest: The run's manifest.
+
+        Returns:
+            The reply directory, or ``None`` when no configure of the tree
+            was recorded before the run (it was generated before recording
+            was enabled; the next ``cmake`` run fixes that).
+        """
+        for summary in reversed(self.summaries()):
+            same_tree = summary.build_dir == manifest.build_dir
+            not_later = summary.created_at <= manifest.created_at
+            candidate = dump.reply_dir(self.runs_dir / summary.run_id)
+            if same_tree and not_later and candidate.is_dir():
+                return candidate
+        return None
 
     def latest(self) -> Run | None:
         """The newest stored run.
@@ -325,7 +375,7 @@ class RunStore:
         summaries = self.summaries()
         if not summaries:
             return None
-        return dump.read_run(self.runs_dir / summaries[-1].run_id)
+        return self.read(summaries[-1].run_id)
 
     def pack(self, ref: str, into: Path) -> Path:
         """Archive one run as ``<into>/<run_id>.tar.zst``.
@@ -362,9 +412,7 @@ class RunStore:
         """
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         directory = dump.unpack(archive, self.runs_dir)
-        run = dump.read_run(directory)
-        with self._summaries_path.open("a", encoding="utf-8") as summaries:
-            summaries.write(json.dumps(asdict(RunSummary.of(run)), sort_keys=True) + "\n")
+        self._append_summary(RunSummary.read(directory))
         newest = self.summaries()[-1].run_id
         self._write_latest(newest)
         return directory
@@ -441,10 +489,18 @@ class RunStore:
                     git_sha=fields.optional_string("git_sha"),
                     labels=fields.strings("labels"),
                     step_count=fields.integer("step_count"),
-                    span_ms=fields.integer("span_ms"),
                 )
             )
         return summaries
+
+    def _append_summary(self, summary: RunSummary) -> None:
+        """Add one line to ``runs.jsonl``.
+
+        Args:
+            summary: The line.
+        """
+        with self._summaries_path.open("a", encoding="utf-8") as summaries:
+            summaries.write(json.dumps(asdict(summary), sort_keys=True) + "\n")
 
     def _rewrite_summaries(self, summaries: Iterable[RunSummary]) -> None:
         """Replace ``runs.jsonl`` atomically.

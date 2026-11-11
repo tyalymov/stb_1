@@ -2,10 +2,11 @@
 
 A run dump should let someone compare two builds a month apart and know
 whether the machine or the sources moved under them. This module collects
-the cheap facts for that: the git state of the sources, how many CPUs the
-build could use, which CMake and generator produced the tree, and which
-compilers served it. Everything here tolerates absence; a build tree outside
-a git repository or a machine without ccache is ordinary, not an error.
+the facts for that which are true only at capture time: the git state of the
+sources, ccache's counters, how many CPUs the build could use, and which
+CMake and generator produced the tree. Everything here tolerates absence; a
+build tree outside a git repository or a machine without ccache is ordinary,
+not an error. Nothing here runs ``cmake``: the callback must stay quick.
 """
 
 from __future__ import annotations
@@ -16,8 +17,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from longpole.cmake import fileapi, tooling
-from longpole.errors import CMakeToolError
+from longpole.cmake import tooling
 from longpole.model import Environment, GitInfo
 
 log = logging.getLogger(__name__)
@@ -29,36 +29,26 @@ _CCACHE_TIMEOUT = 10.0
 """Seconds to wait for ccache; same reasoning."""
 
 
-def collect(build_dir: Path, *, reply: fileapi.Reply | None) -> Environment:
+def collect(build_dir: Path) -> Environment:
     """Gather the environment of a build tree at capture time.
 
-    Reads the cache for the generator and the configuring ``cmake``, asks
-    that binary for its full version string (the cache only knows
-    ``major.minor.patch``), and looks at the source checkout, the CPUs and
-    ccache. Every part tolerates absence: an unconfigured tree yields an
-    :class:`~longpole.model.Environment` of ``None`` values.
+    Reads the cache for the generator and the CMake version, and looks at
+    the source checkout, the CPUs and ccache. Every part tolerates absence:
+    an unconfigured tree yields an :class:`~longpole.model.Environment` of
+    ``None`` values.
 
     Args:
         build_dir: The build tree.
-        reply: File API reply for the tree, for the toolchains; ``None`` when
-            CMake has not answered yet.
 
     Returns:
         What could be learned.
     """
     cache = tooling.read_cache(build_dir)
-    cmake_version = cache.cmake_version
-    if cache.cmake_command is not None:
-        try:
-            cmake_version = tooling.describe(cache.cmake_command).version
-        except CMakeToolError as exc:
-            log.debug("cannot describe %s, keeping the cache version: %s", cache.cmake_command, exc)
     return Environment(
-        cmake_version=cmake_version,
+        cmake_version=cache.cmake_version,
         generator=cache.generator,
         cpu_count=cpu_count(),
         git=git_info(cache.source_dir or build_dir),
-        toolchains=fileapi.toolchains_from_reply(reply) if reply is not None else (),
         ccache=ccache_stats(),
     )
 

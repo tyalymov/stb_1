@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Final
 
-DUMP_FORMAT_VERSION: Final = 1
+DUMP_FORMAT_VERSION: Final = 2
 """Version of the on-disk run dump layout described in ``docs/dump-format.md``."""
 
 KNOWN_ROLES: Final = frozenset(
@@ -308,11 +308,10 @@ class Environment:
     """Everything about the machine and checkout that is not in CMake's data.
 
     Attributes:
-        cmake_version: ``cmake --version`` of the binary that wrote the data.
+        cmake_version: Version of the CMake that configured the tree, from its cache.
         generator: CMake generator of the build tree, e.g. ``Ninja``.
         cpu_count: Logical CPUs visible to longpole when it captured the run.
         git: Checkout state, or ``None`` outside a git repository.
-        toolchains: Compilers per language, empty when the File API reply is missing.
         ccache: ``ccache`` statistics as key/value text, or ``None`` without ccache.
     """
 
@@ -320,7 +319,6 @@ class Environment:
     generator: str | None
     cpu_count: int | None
     git: GitInfo | None
-    toolchains: tuple[Toolchain, ...] = ()
     ccache: dict[str, str] | None = None
 
 
@@ -360,11 +358,10 @@ class Run:
 
     Attributes:
         manifest: Capture metadata.
-        steps: Every step the index listed, in index order. May be empty: the
-            ``postCMakeWorkflow`` hook fires after every snippet is already
-            consumed by the per-step hooks.
+        steps: Every step the index listed, in index order.
         graph: Target dependency graph, or ``None`` when no File API reply
-            existed for this build tree.
+            describes the tree as it was for this run.
+        toolchains: Compilers per language from the same reply; empty without one.
         system: Static host information, or ``None`` when the query did not
             ask for it.
     """
@@ -372,6 +369,7 @@ class Run:
     manifest: Manifest
     steps: tuple[Step, ...]
     graph: Graph | None = None
+    toolchains: tuple[Toolchain, ...] = ()
     system: SystemInfo | None = None
 
     def steps_with_role(self, role: str) -> tuple[Step, ...]:
