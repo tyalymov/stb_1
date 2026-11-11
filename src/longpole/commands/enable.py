@@ -213,31 +213,20 @@ def callback_command(*, store: Path, labels: tuple[str, ...] = ()) -> str:
         labels: ``--label`` values for the callback.
 
     Returns:
-        ``<path> capture --store PATH [--label NAME]...`` or the same after
-        ``<python> -m longpole``, with paths and labels double-quoted when
-        they contain whitespace.
+        ``"<path>" capture --store "PATH" [--label "NAME"]...`` or the same
+        after ``"<python>" -m longpole``; every value is double-quoted, which
+        CMake's argument splitting reads the same whether or not it contains
+        whitespace.
     """
     script = shutil.which("longpole")
     if script is not None:
-        command = f"{_quoted(script)} capture"
+        command = f'"{script}" capture'
     else:
-        command = f"{_quoted(sys.executable)} -m longpole capture"
-    command += f" --store {_quoted(str(store.resolve()))}"
+        command = f'"{sys.executable}" -m longpole capture'
+    command += f' --store "{store.resolve()}"'
     for label in labels:
-        command += f" --label {_quoted(label)}"
+        command += f' --label "{label}"'
     return command
-
-
-def _quoted(path: str) -> str:
-    """Double-quote a path if it contains whitespace.
-
-    Args:
-        path: The path.
-
-    Returns:
-        The path, quoted when needed.
-    """
-    return f'"{path}"' if any(character.isspace() for character in path) else path
 
 
 def _describe(result: EnableResult) -> str:

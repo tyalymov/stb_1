@@ -64,7 +64,7 @@ def test_callback_prefers_the_installed_script(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(shutil, "which", _which("/opt/tools/bin/longpole"))
     assert (
         enable.callback_command(store=Path("/opt/runs"))
-        == "/opt/tools/bin/longpole capture --store /opt/runs"
+        == '"/opt/tools/bin/longpole" capture --store "/opt/runs"'
     )
 
 
@@ -73,16 +73,7 @@ def test_callback_falls_back_to_this_interpreter(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(shutil, "which", _which(None))
     assert (
         enable.callback_command(store=Path("/opt/runs"))
-        == f"{sys.executable} -m longpole capture --store /opt/runs"
-    )
-
-
-def test_paths_with_spaces_are_quoted(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A path with a space is wrapped in double quotes so CMake keeps it as one argument."""
-    monkeypatch.setattr(shutil, "which", _which("/Applications/Dev Tools/longpole"))
-    assert (
-        enable.callback_command(store=Path("/opt/runs"))
-        == '"/Applications/Dev Tools/longpole" capture --store /opt/runs'
+        == f'"{sys.executable}" -m longpole capture --store "/opt/runs"'
     )
 
 
@@ -91,7 +82,8 @@ def test_labels_and_store_go_into_the_callback(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(shutil, "which", _which("/opt/tools/bin/longpole"))
     command = enable.callback_command(store=Path("/opt/runs/my store"), labels=("nightly", "ci:42"))
     assert command == (
-        '/opt/tools/bin/longpole capture --store "/opt/runs/my store" --label nightly --label ci:42'
+        '"/opt/tools/bin/longpole" capture --store "/opt/runs/my store" '
+        '--label "nightly" --label "ci:42"'
     )
 
 
