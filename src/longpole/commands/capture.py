@@ -28,7 +28,7 @@ from longpole.analyzers.critical_path import CriticalPath, critical_path
 from longpole.cmake import fileapi, snippets, tooling
 from longpole.commands.options import Store
 from longpole.errors import CMakeToolError
-from longpole.model import Graph, Manifest, Run
+from longpole.model import Graph, Manifest, Run, Step
 from longpole.store import RunStore, new_run_id, resolve_store
 
 log = logging.getLogger(__name__)
@@ -36,21 +36,17 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class Outcome:
-    """What one callback invocation did.
+    """What one callback invocation stored.
 
     Attributes:
-        hook: Hook that fired.
-        run: The stored run, or ``None`` when nothing was recorded.
-        directory: The run's directory in the store, or ``None``.
+        run: The stored run.
         graph_pending: No File API reply existed; the query was planted for
             the next configure.
         needs_reconfigure: The build system predates the query, so compile,
             link and custom steps are missing from this run.
     """
 
-    hook: str
-    run: Run | None
-    directory: Path | None
+    run: Run
     graph_pending: bool
     needs_reconfigure: bool
 
@@ -79,57 +75,52 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
         FileApiError: A File API reply exists but cannot be read.
         OSError: The store cannot be written.
     """
+    parsed = snippets.read_index(index)
+    steps = snippets.read_steps(parsed)
+    if not steps:
+        output.stderr(f"longpole: {parsed.hook}: empty index, nothing recorded")
+        return 0
     labels = list(label)
     ci_run_id = os.environ.get("GITHUB_RUN_ID")  # set by GitHub Actions
     if ci_run_id:
         labels.append(f"ci:{ci_run_id}")
-    outcome = record(index, store_override=store, environ=os.environ, labels=tuple(labels))
+    outcome = record(parsed, steps, store_override=store, environ=os.environ, labels=tuple(labels))
     output.stderr(status_line(outcome))
     return 0
 
 
 def record(
-    index_path: Path,
+    index: snippets.Index,
+    steps: tuple[Step, ...],
     *,
     store_override: Path | None,
     environ: Mapping[str, str],
     labels: tuple[str, ...] = (),
     now: datetime | None = None,
 ) -> Outcome:
-    """Turn one index into a stored run.
+    """Turn one index and its steps into a stored run.
 
-    Reads the index and its snippets, resolves the build tree, loads the File
-    API reply (or plants the query when there is none), collects the
-    environment, checks whether the build system predates the query, and
-    writes the run. The raw index and snippets are copied into the dump
-    before this function returns, since CMake deletes them afterwards.
+    Resolves the build tree, loads the File API reply (or plants the query
+    when there is none), collects the environment, checks whether the build
+    system predates the query, and writes the run. The raw index and snippets
+    are copied into the dump before this function returns, since CMake
+    deletes them afterwards.
 
     Args:
-        index_path: The index file.
+        index: The index, already read.
+        steps: Its steps, at least one.
         store_override: ``--store``, if given.
         environ: Environment variables, for the store rule.
         labels: Labels to attach besides the automatic ones.
         now: Capture time; defaults to the current UTC time.
 
     Returns:
-        What happened. ``run`` is ``None`` for an index without snippets.
+        What was stored.
 
     Raises:
-        FileNotFoundError: The index or a snippet is already gone.
-        IndexFormatError: The index is not v1 data.
-        SnippetFormatError: A snippet is not v1 data.
-        SchemaError: The index or a snippet violates the published schema.
         FileApiError: A File API reply exists but cannot be read.
-        OSError: The store cannot be written.
+        OSError: The store cannot be written, or a snippet is already gone.
     """
-    index = snippets.read_index(index_path)
-    steps = snippets.read_steps(index)
-    if not steps:
-        log.info("%s: index %s lists no snippets; nothing to record", index.hook, index_path)
-        return Outcome(
-            hook=index.hook, run=None, directory=None, graph_pending=False, needs_reconfigure=False
-        )
-
     build_dir = index.build_dir.resolve()
     reply = fileapi.read_reply(build_dir)
     graph: Graph | None = None
@@ -162,13 +153,7 @@ def record(
     store = RunStore(resolve_store(store_override, build_dir=build_dir, environ=environ))
     directory = store.write(captured, raw_index=index.path, raw_snippets=index.snippet_paths)
     log.info("stored %s as %s", index.hook, directory)
-    return Outcome(
-        hook=index.hook,
-        run=captured,
-        directory=directory,
-        graph_pending=graph is None,
-        needs_reconfigure=needs_reconfigure,
-    )
+    return Outcome(run=captured, graph_pending=graph is None, needs_reconfigure=needs_reconfigure)
 
 
 def status_line(outcome: Outcome) -> str:
@@ -180,11 +165,8 @@ def status_line(outcome: Outcome) -> str:
     Returns:
         ``longpole: <hook> recorded as <id>: N steps, 1.6 s, critical path
         1.2 s (74%)`` plus a hint when the graph is pending or a reconfigure
-        is needed; the critical path part is left out when there is none;
-        or ``longpole: <hook>: empty index, nothing recorded``.
+        is needed; the critical path part is left out when there is none.
     """
-    if outcome.run is None:
-        return f"longpole: {outcome.hook}: empty index, nothing recorded"
     run = outcome.run
     count = len(run.steps)
     text = (

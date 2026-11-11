@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from longpole.cli import main
 from longpole.cmake import fileapi
 from longpole.commands import capture
 from longpole.model import Run
@@ -162,7 +163,7 @@ def test_tree_generated_before_the_query_is_labelled_until_reconfigured(
     assert _roles(store, "postCMakeBuild") == CHAIN_BUILD_ROLES
 
 
-def test_empty_index_records_nothing(tmp_path: Path) -> None:
+def test_empty_index_records_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """An index without snippets, as postCMakeWorkflow produces, leaves the store untouched."""
     index = tmp_path / "index-1.json"
     index.write_text(
@@ -177,13 +178,11 @@ def test_empty_index_records_nothing(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    outcome = capture.record(index, store_override=tmp_path / "store", environ={})
-    assert outcome.run is None
-    assert outcome.hook == "postCMakeWorkflow"
+    assert main(["capture", str(index), "--store", str(tmp_path / "store")]) == 0
     assert not (tmp_path / "store").exists()
-    assert capture.status_line(outcome) == (
+    assert capsys.readouterr().err.splitlines() == [
         "longpole: postCMakeWorkflow: empty index, nothing recorded"
-    )
+    ]
 
 
 def test_status_line_names_the_run_and_the_hints() -> None:
@@ -191,19 +190,13 @@ def test_status_line_names_the_run_and_the_hints() -> None:
     from tests.support.runs import sample_run
 
     run = sample_run()
-    plain = capture.Outcome(
-        hook="postCMakeBuild", run=run, directory=None, graph_pending=False, needs_reconfigure=False
-    )
+    plain = capture.Outcome(run=run, graph_pending=False, needs_reconfigure=False)
     assert capture.status_line(plain) == (
         "longpole: postCMakeBuild recorded as 20261031T120000Z-abc123: 8 steps, 2.4 s, "
         "critical path 132 ms (5%) (longpole analyze)"
     )
     hinted = capture.Outcome(
-        hook="postCMakeBuild",
-        run=sample_run(with_graph=False),
-        directory=None,
-        graph_pending=True,
-        needs_reconfigure=True,
+        run=sample_run(with_graph=False), graph_pending=True, needs_reconfigure=True
     )
     assert capture.status_line(hinted) == (
         "longpole: postCMakeBuild recorded as 20261031T120000Z-abc123: 8 steps, 2.4 s; "
