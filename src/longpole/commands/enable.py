@@ -78,7 +78,7 @@ def enable(
         OSError: A query directory cannot be created or written.
     """
     result = write_query(build_dir, labels=label, store=store)
-    output.result(result, output_format, text=_describe)
+    output.result(result, output_format, text=lambda r: f"enabled: {r.query}")
     return 0
 
 
@@ -227,15 +227,3 @@ def callback_command(*, store: Path, labels: tuple[str, ...] = ()) -> str:
     for label in labels:
         command += f' --label "{label}"'
     return command
-
-
-def _describe(result: EnableResult) -> str:
-    """Render a result as a few lines for a person.
-
-    Args:
-        result: The result.
-
-    Returns:
-        The text.
-    """
-    return f"enabled: {result.query}\ncallback: {result.callback}"
