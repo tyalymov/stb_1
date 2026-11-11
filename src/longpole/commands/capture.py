@@ -5,9 +5,11 @@ every snippet it lists as soon as all callbacks have returned. So this
 command copies: the index, the snippets and, after a configure, the File
 API reply, plus a manifest with what is only knowable now (time, labels,
 git state, ccache counters). From the index it takes only what the copy
-needs: which files, which tree, which hook. It runs no ``cmake``; everything
-else is derived when a run is read. One line on standard error says what
-was stored.
+needs: which files, which tree, which hook; the vendored schema is not
+consulted, since a CMake newer than it writes a data minor it forbids and
+the data must be stored all the same. It runs no ``cmake``; everything else
+is derived when a run is read. One line on standard error says what was
+stored.
 
 An index with no snippets, which the ``postCMakeWorkflow`` hook produces
 because the per-step hooks consumed everything already, records nothing.
@@ -24,9 +26,8 @@ from cyclopts import Parameter
 
 from longpole import __version__, env, output
 from longpole.cmake import fileapi
-from longpole.cmake.schema import validate
-from longpole.errors import IndexFormatError, SchemaError
-from longpole.jsonfields import FieldError, Fields, Json, load_object
+from longpole.errors import IndexFormatError
+from longpole.jsonfields import FieldError, Fields, load_object
 from longpole.model import Manifest
 from longpole.store import RunStore, new_run_id
 
@@ -63,7 +64,6 @@ def capture(
     """
     try:
         document = load_object(index)
-        _warn_unless_valid(document, index)
         fields = Fields(document)
         hook = fields.string("hook")
         build_dir = Path(fields.string("buildDir")).resolve()
@@ -102,21 +102,3 @@ def capture(
         f"{count} snippet{'s' if count != 1 else ''} (longpole analyze)"
     )
     return 0
-
-
-def _warn_unless_valid(document: Json, index: Path) -> None:
-    """Check the index against the vendored schema; a mismatch is a warning, not a refusal.
-
-    A CMake newer than the schema writes a data minor the schema forbids.
-    The data is stored regardless and read with whatever the reader knows,
-    so the only thing to do here is to say so in the build log. The fields
-    the copy needs are read afterwards with their own, fatal, check.
-
-    Args:
-        document: The parsed index.
-        index: Its path, for the message.
-    """
-    try:
-        validate("index", document, source=str(index))
-    except SchemaError as exc:
-        log.warning("%s; stored anyway", exc)

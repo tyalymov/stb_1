@@ -49,11 +49,12 @@ instrumentation API (`Help/manual/cmake-instrumentation.7.rst` in the CMake
 sources). Snippet paths inside the copied index still name CMake's data
 directory; readers resolve them against `raw/snippets/` instead.
 
-The callback checks the index against the vendored schema and only warns on
-a mismatch; reading validates nothing. A CMake newer than the reader writes
-fields and versions the schema forbids, and the point of keeping raw files is
-that such a dump is still stored and still reads: unknown snippet fields land
-in `Step.extra`.
+Neither the callback nor the readers validate against the vendored schema:
+a CMake newer than it writes fields and versions the schema forbids, and the
+point of keeping raw files is that such a dump is still stored and still
+reads, unknown snippet fields landing in `Step.extra`. The schema serves the
+tests, which check longpole's reading of the format against CMake's own
+description of it.
 
 ## raw/fileapi/
 

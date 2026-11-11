@@ -185,10 +185,10 @@ def test_empty_index_records_nothing(tmp_path: Path, capsys: pytest.CaptureFixtu
     ]
 
 
-def test_index_of_a_newer_data_version_is_stored_with_a_warning(
+def test_index_of_a_newer_data_version_is_stored(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Data the vendored schema does not know is copied anyway, with a warning in the log."""
+    """Data the vendored schema does not know is copied anyway and reads back."""
     build = tmp_path / "build"
     data = build / ".cmake" / "instrumentation" / "v1" / "data"
     data.mkdir(parents=True)
@@ -223,9 +223,7 @@ def test_index_of_a_newer_data_version_is_stored_with_a_warning(
     )
     store_dir = tmp_path / "store"
     assert main(["capture", str(index), "--store", str(store_dir)]) == 0
-    err = capsys.readouterr().err
-    assert "WARNING: index file" in err and "stored anyway" in err
-    assert "recorded as" in err
+    assert "recorded as" in capsys.readouterr().err
 
     run = RunStore(store_dir).read("latest")
     assert run.data_version.minor == 3
