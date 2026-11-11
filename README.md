@@ -182,7 +182,13 @@ longpole can re-read an old run. The layout is described in
 Runs live in `<build>/.longpole/` for a tree you enabled, or in your user
 data directory for `--global` (`~/.local/share/longpole` on Linux,
 `~/Library/Application Support/longpole` on macOS). `--store PATH` or
-`LONGPOLE_STORE` points everything at another directory.
+`LONGPOLE_STORE` points everything at another directory. `enable --store
+PATH` and `enable --label NAME` are written into the callback itself, so a
+CI job can say once where its runs go and how they are tagged:
+
+```sh
+longpole enable build --store "$RUNNER_TEMP/longpole" --label "ci:$GITHUB_RUN_ID"
+```
 
 ## Limits
 

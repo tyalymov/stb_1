@@ -29,7 +29,7 @@ from cyclopts import Parameter
 
 from longpole import output
 from longpole.cmake import fileapi, tooling
-from longpole.commands.options import Output
+from longpole.commands.options import Output, Store
 from longpole.errors import CMakeToolError, UsageError
 from longpole.model import DataVersion
 from longpole.store import IN_TREE
@@ -63,6 +63,8 @@ def enable(
     /,
     *,
     everywhere: Annotated[bool, Parameter(name="--global")] = False,
+    label: tuple[str, ...] = (),
+    store: Store = None,
     output_format: Output = "text",
 ) -> int:
     """Switch CMake instrumentation on for a build tree, or for every build with --global.
@@ -70,11 +72,15 @@ def enable(
     Write the query file that makes CMake record every step and call
     'longpole capture' afterwards. With a build tree, also ask the File API
     for the target graph and mark the tree as having its own run store.
-    Nothing in the project changes. 'longpole disable' undoes it.
+    Labels and a store given here are written into the callback, so every
+    run it records carries them. Nothing in the project changes.
+    'longpole disable' undoes it.
 
     Args:
         build_dir: Build tree to instrument; may not exist yet.
         everywhere: Instrument every build of this user on this machine instead.
+        label: Label every recorded run; may be repeated.
+        store: Run store the callback writes to; without it, the tree's own store.
         output_format: text, or json for a program.
 
     Returns:
@@ -88,12 +94,14 @@ def enable(
     """
     if (build_dir is None) == (not everywhere):
         raise UsageError("enable: give a build tree or --global, not both and not neither")
-    result = write_query(build_dir)
+    result = write_query(build_dir, labels=label, store=store)
     output.result(result, output_format, text=_describe)
     return 0
 
 
-def write_query(build_dir: Path | None) -> EnableResult:
+def write_query(
+    build_dir: Path | None, *, labels: tuple[str, ...] = (), store: Path | None = None
+) -> EnableResult:
     """Write the query file for a build tree, or for the user when ``build_dir`` is ``None``.
 
     The ``cmake`` on PATH is asked which data version it writes, so the query
@@ -101,11 +109,13 @@ def write_query(build_dir: Path | None) -> EnableResult:
     whole). No ``cmake``, or one older than 4.3, is a warning, not an error:
     the file is written for data version 1.0 and starts working as soon as a
     CMake that knows the API builds the tree. Writing the same file again is
-    harmless. For a build tree the File API query and the in-tree store
-    directory are created as well.
+    harmless. For a build tree the File API query is planted as well, and
+    the in-tree store directory unless ``store`` points elsewhere.
 
     Args:
         build_dir: The tree, or ``None`` for the user-level directory.
+        labels: Labels the callback attaches to every run.
+        store: Store the callback writes to, or ``None`` for the resolved one.
 
     Returns:
         What was written.
@@ -127,7 +137,7 @@ def write_query(build_dir: Path | None) -> EnableResult:
             "record nothing; the query waits for a newer cmake",
             info.version,
         )
-    callback = callback_command()
+    callback = callback_command(labels=labels, store=store)
     query = query_location(build_dir)
     query.parent.mkdir(parents=True, exist_ok=True)
     document = query_document(data_version, callback)
@@ -138,7 +148,8 @@ def write_query(build_dir: Path | None) -> EnableResult:
     regenerate_needed = False
     if build_dir is not None:
         file_api_query = fileapi.write_query(build_dir)
-        (build_dir / IN_TREE).mkdir(parents=True, exist_ok=True)
+        if store is None:  # an in-tree store would shadow the one the callback writes to
+            (build_dir / IN_TREE).mkdir(parents=True, exist_ok=True)
         regenerate_needed = (build_dir / "CMakeCache.txt").is_file()
     return EnableResult(
         scope="global" if build_dir is None else "tree",
@@ -229,22 +240,36 @@ def query_document(data_version: DataVersion, callback: str) -> dict[str, object
     }
 
 
-def callback_command() -> str:
+def callback_command(*, labels: tuple[str, ...] = (), store: Path | None = None) -> str:
     """The command line CMake runs at each hook.
 
     IDEs and CI runners often start ``cmake`` with a different ``PATH`` than
     the shell that ran ``enable``, so the command names the executable by
     absolute path: the installed ``longpole`` script when there is one,
-    otherwise this interpreter with ``-m longpole``.
+    otherwise this interpreter with ``-m longpole``. Labels and the store go
+    on the command line too, since the callback gets nothing else from the
+    shell that enabled recording; the store is made absolute for the same
+    reason.
+
+    Args:
+        labels: ``--label`` values for the callback.
+        store: ``--store`` for the callback, or ``None`` to leave the choice to it.
 
     Returns:
-        ``<path> capture`` or ``<python> -m longpole capture``, with paths
-        double-quoted when they contain whitespace.
+        ``<path> capture [--label NAME]... [--store PATH]`` or the same after
+        ``<python> -m longpole``, with paths and labels double-quoted when
+        they contain whitespace.
     """
     script = shutil.which("longpole")
     if script is not None:
-        return f"{_quoted(script)} capture"
-    return f"{_quoted(sys.executable)} -m longpole capture"
+        command = f"{_quoted(script)} capture"
+    else:
+        command = f"{_quoted(sys.executable)} -m longpole capture"
+    for label in labels:
+        command += f" --label {_quoted(label)}"
+    if store is not None:
+        command += f" --store {_quoted(str(store.resolve()))}"
+    return command
 
 
 def _quoted(path: str) -> str:

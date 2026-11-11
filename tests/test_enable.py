@@ -14,7 +14,7 @@ from longpole.cli import main
 from longpole.cmake import fileapi, tooling
 from longpole.commands import enable
 from longpole.model import DataVersion
-from longpole.store import IN_TREE
+from longpole.store import IN_TREE, RunStore
 from tests.conftest import cmake_version_of, make_project
 
 CAPTURE_HOOKS = [
@@ -75,6 +75,15 @@ def test_paths_with_spaces_are_quoted(monkeypatch: pytest.MonkeyPatch) -> None:
     """A path with a space is wrapped in double quotes so CMake keeps it as one argument."""
     monkeypatch.setattr(shutil, "which", _which("/Applications/Dev Tools/longpole"))
     assert enable.callback_command() == '"/Applications/Dev Tools/longpole" capture'
+
+
+def test_labels_and_store_go_into_the_callback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The callback gets nothing from the enabling shell, so labels and the store ride along."""
+    monkeypatch.setattr(shutil, "which", _which("/opt/tools/bin/longpole"))
+    command = enable.callback_command(labels=("nightly", "ci:42"), store=Path("/opt/runs/my store"))
+    assert command == (
+        '/opt/tools/bin/longpole capture --label nightly --label ci:42 --store "/opt/runs/my store"'
+    )
 
 
 @pytest.mark.cmake
@@ -165,6 +174,28 @@ def test_configured_tree_gets_the_regenerate_hint(
 
     assert main(["enable", str(project.build_dir)]) == 0
     assert "run cmake again" in capsys.readouterr().out
+
+
+@pytest.mark.cmake
+@pytest.mark.slow
+def test_enable_with_label_and_store_records_there_with_the_label(
+    tmp_path: Path, cmake_on_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What enable was given reaches every run; an explicit store leaves no in-tree one."""
+    monkeypatch.delenv("LONGPOLE_STORE", raising=False)
+    project = make_project("chain", tmp_path, cmake_on_path)
+    store_dir = tmp_path / "my store"
+    assert (
+        main(["enable", str(project.build_dir), "--label", "nightly", "--store", str(store_dir)])
+        == 0
+    )
+    assert not (project.build_dir / IN_TREE).exists()
+    project.configure()
+    project.build()
+
+    store = RunStore(store_dir)
+    assert [summary.hook for summary in store.summaries()] == ["postGenerate", "postCMakeBuild"]
+    assert store.read("latest").manifest.labels == ("nightly",)
 
 
 def test_missing_cmake_is_a_warning_not_a_refusal(
