@@ -18,31 +18,40 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated
+
+from cyclopts import Parameter
 
 from longpole import __version__, env, output
 from longpole.cmake import fileapi
 from longpole.cmake.schema import validate
-from longpole.commands.options import Store
 from longpole.errors import IndexFormatError, SchemaError
 from longpole.jsonfields import FieldError, Fields, Json, load_object
 from longpole.model import Manifest
-from longpole.store import RunStore, new_run_id, resolve_store
+from longpole.store import RunStore, new_run_id
 
 log = logging.getLogger(__name__)
 
 
-def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None) -> int:
+def capture(
+    index: Path,
+    /,
+    *,
+    store: Annotated[Path, Parameter(name="--store", help="run store to write the run to")],
+    label: tuple[str, ...] = (),
+) -> int:
     """Store the run an instrumentation index describes; CMake runs this at each hook.
 
     Copy a CMake instrumentation index, its snippets and, after a configure,
     the File API reply into the store before CMake deletes the data.
-    Registered as the callback by 'longpole enable'; rarely run by hand.
-    One status line goes to standard error.
+    Registered as the callback by 'longpole enable', which puts the store
+    and the labels on its command line; rarely run by hand. One status line
+    goes to standard error.
 
     Args:
         index: Index file; CMake appends it to the callback.
+        store: Run store to write the run to.
         label: Label the run; may be repeated.
-        store: Run store to write to instead of the resolved one.
 
     Returns:
         0; a skipped empty index is a success too.
@@ -80,7 +89,7 @@ def capture(index: Path, /, *, label: tuple[str, ...] = (), store: Store = None)
     # The reply is rewritten by every generate, so the copy taken right after
     # one describes the tree every build until the next configure runs on.
     reply = fileapi.reply_dir(build_dir)
-    directory = RunStore(resolve_store(store, build_dir=build_dir)).write(
+    directory = RunStore(store).write(
         manifest,
         index=index,
         snippets=snippets,

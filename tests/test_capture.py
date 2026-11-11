@@ -23,14 +23,13 @@ def _instrument(project: CMakeProject, store: Path, *hooks: str, label: str | No
 
     Args:
         project: The fixture project.
-        store: Where the callback should write runs (through ``LONGPOLE_STORE``).
+        store: Where the callback should write runs, as ``enable`` would bake it in.
         *hooks: Hooks to request.
         label: ``--label`` value to pass to the callback, if any.
     """
-    callback = f"{sys.executable} -m longpole capture"
+    callback = f'{sys.executable} -m longpole capture --store "{store}"'
     if label is not None:
         callback += f" --label {label}"
-    project.set_env(LONGPOLE_STORE=str(store))
     project.write_query(
         InstrumentationQuery(
             hooks=hooks,

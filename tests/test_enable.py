@@ -62,27 +62,36 @@ def test_query_asks_for_process_metrics_only_from_data_1_2() -> None:
 def test_callback_prefers_the_installed_script(monkeypatch: pytest.MonkeyPatch) -> None:
     """With a `longpole` script on PATH the callback names it by absolute path."""
     monkeypatch.setattr(shutil, "which", _which("/opt/tools/bin/longpole"))
-    assert enable.callback_command() == "/opt/tools/bin/longpole capture"
+    assert (
+        enable.callback_command(store=Path("/opt/runs"))
+        == "/opt/tools/bin/longpole capture --store /opt/runs"
+    )
 
 
 def test_callback_falls_back_to_this_interpreter(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without a script the callback runs the package through the current Python."""
     monkeypatch.setattr(shutil, "which", _which(None))
-    assert enable.callback_command() == f"{sys.executable} -m longpole capture"
+    assert (
+        enable.callback_command(store=Path("/opt/runs"))
+        == f"{sys.executable} -m longpole capture --store /opt/runs"
+    )
 
 
 def test_paths_with_spaces_are_quoted(monkeypatch: pytest.MonkeyPatch) -> None:
     """A path with a space is wrapped in double quotes so CMake keeps it as one argument."""
     monkeypatch.setattr(shutil, "which", _which("/Applications/Dev Tools/longpole"))
-    assert enable.callback_command() == '"/Applications/Dev Tools/longpole" capture'
+    assert (
+        enable.callback_command(store=Path("/opt/runs"))
+        == '"/Applications/Dev Tools/longpole" capture --store /opt/runs'
+    )
 
 
 def test_labels_and_store_go_into_the_callback(monkeypatch: pytest.MonkeyPatch) -> None:
     """The callback gets nothing from the enabling shell, so labels and the store ride along."""
     monkeypatch.setattr(shutil, "which", _which("/opt/tools/bin/longpole"))
-    command = enable.callback_command(labels=("nightly", "ci:42"), store=Path("/opt/runs/my store"))
+    command = enable.callback_command(store=Path("/opt/runs/my store"), labels=("nightly", "ci:42"))
     assert command == (
-        '/opt/tools/bin/longpole capture --label nightly --label ci:42 --store "/opt/runs/my store"'
+        '/opt/tools/bin/longpole capture --store "/opt/runs/my store" --label nightly --label ci:42'
     )
 
 
@@ -100,7 +109,7 @@ def test_enable_writes_query_graph_request_and_store_marker(
     assert expected_minor is not None
     assert document["version"] == {"major": 1, "minor": expected_minor.minor}
     assert document["hooks"] == CAPTURE_HOOKS
-    assert document["callbacks"] == [enable.callback_command()]
+    assert document["callbacks"] == [enable.callback_command(store=build / IN_TREE)]
     assert fileapi.query_path(build).is_file()
     assert (build / IN_TREE).is_dir()
 

@@ -70,7 +70,7 @@ def enable(
     Args:
         build_dir: Build tree to instrument; may not exist yet.
         label: Label every recorded run; may be repeated.
-        store: Run store the callback writes to; without it, the tree's own store.
+        store: Run store the callback writes to; without it, <build>/.longpole.
         output_format: text, or json for a program.
 
     Returns:
@@ -95,12 +95,13 @@ def write_query(
     the file is written for data version 1.0 and starts working as soon as a
     CMake that knows the API builds the tree. Writing the same file again is
     harmless. The File API query is planted as well, and the in-tree store
-    directory unless ``store`` points elsewhere.
+    directory unless ``store`` points elsewhere. The callback gets the store
+    on its command line either way; it never has to work one out.
 
     Args:
         build_dir: The tree.
         labels: Labels the callback attaches to every run.
-        store: Store the callback writes to, or ``None`` for the resolved one.
+        store: Store the callback writes to, or ``None`` for ``<build>/.longpole``.
 
     Returns:
         What was written.
@@ -120,7 +121,8 @@ def write_query(
             "record nothing; the query waits for a newer cmake",
             info.version,
         )
-    callback = callback_command(labels=labels, store=store)
+    target = store if store is not None else build_dir / IN_TREE
+    callback = callback_command(labels=labels, store=target)
     query = query_location(build_dir)
     query.parent.mkdir(parents=True, exist_ok=True)
     document = query_document(data_version, callback)
@@ -202,23 +204,23 @@ def query_document(data_version: DataVersion, callback: str) -> dict[str, object
     }
 
 
-def callback_command(*, labels: tuple[str, ...] = (), store: Path | None = None) -> str:
+def callback_command(*, store: Path, labels: tuple[str, ...] = ()) -> str:
     """The command line CMake runs at each hook.
 
     IDEs and CI runners often start ``cmake`` with a different ``PATH`` than
     the shell that ran ``enable``, so the command names the executable by
     absolute path: the installed ``longpole`` script when there is one,
-    otherwise this interpreter with ``-m longpole``. Labels and the store go
-    on the command line too, since the callback gets nothing else from the
-    shell that enabled recording; the store is made absolute for the same
-    reason.
+    otherwise this interpreter with ``-m longpole``. The store and the
+    labels go on the command line too, since the callback gets nothing else
+    from the shell that enabled recording; the store is made absolute for
+    the same reason.
 
     Args:
+        store: ``--store`` for the callback.
         labels: ``--label`` values for the callback.
-        store: ``--store`` for the callback, or ``None`` to leave the choice to it.
 
     Returns:
-        ``<path> capture [--label NAME]... [--store PATH]`` or the same after
+        ``<path> capture --store PATH [--label NAME]...`` or the same after
         ``<python> -m longpole``, with paths and labels double-quoted when
         they contain whitespace.
     """
@@ -227,10 +229,9 @@ def callback_command(*, labels: tuple[str, ...] = (), store: Path | None = None)
         command = f"{_quoted(script)} capture"
     else:
         command = f"{_quoted(sys.executable)} -m longpole capture"
+    command += f" --store {_quoted(str(store.resolve()))}"
     for label in labels:
         command += f" --label {_quoted(label)}"
-    if store is not None:
-        command += f" --store {_quoted(str(store.resolve()))}"
     return command
 
 

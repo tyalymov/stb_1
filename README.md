@@ -179,10 +179,11 @@ when a run is read, so a dump written by an older longpole still reads with
 a newer one. The layout is described in
 [docs/dump-format.md](docs/dump-format.md).
 
-Runs live in `<build>/.longpole/` of the tree you enabled. `--store PATH` or
-`LONGPOLE_STORE` points everything at another directory. `enable --store
-PATH` and `enable --label NAME` are written into the callback itself, so a
-CI job can say once where its runs go and how they are tagged:
+Runs live in `<build>/.longpole/` of the tree you enabled; `enable --store
+PATH` puts them elsewhere. The store and any `enable --label NAME` are
+written into the callback itself, so the callback never has to work out
+where to write and a CI job can say once where its runs go and how they
+are tagged:
 
 ```sh
 longpole enable build --store "$RUNNER_TEMP/longpole" --label "ci:$GITHUB_RUN_ID"
