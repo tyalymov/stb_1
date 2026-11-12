@@ -16,13 +16,12 @@ from cyclopts import Parameter
 
 from longpole import output
 from longpole.analyzers.report import build_report
-from longpole.cmake import tooling
 from longpole.commands.analyze import load_run
 from longpole.commands.options import Store
 from longpole.errors import UsageError
 from longpole.exporters import markdown as markdown_snapshot
 from longpole.exporters import perfetto as perfetto_trace
-from longpole.store import RunStore, resolve_store
+from longpole.store import RunStore
 
 log = logging.getLogger(__name__)
 
@@ -33,23 +32,23 @@ def export(
     run: str | None = None,
     /,
     *,
+    store: Store,
     perfetto: Annotated[str | None, Parameter(metavar="PATH", allow_leading_hyphen=True)] = None,
     markdown: Annotated[str | None, Parameter(metavar="PATH", allow_leading_hyphen=True)] = None,
-    store: Store = None,
 ) -> int:
     """Write a run as a Perfetto trace or a Markdown snapshot.
 
     Render one stored run for another tool. --perfetto writes a Chrome JSON
     trace that ui.perfetto.dev opens directly; --markdown writes a snapshot
-    for a CI job summary or check run. Defaults to the newest run of the
-    build tree you are in, or the newest run in the store.
+    for a CI job summary or check run. Defaults to the newest run in the
+    store.
 
     Args:
         run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
             or a dump path.
+        store: Run store to read.
         perfetto: Write the Perfetto trace to PATH ('-' for standard output).
         markdown: Write the Markdown snapshot to PATH ('-' for standard output).
-        store: Run store to read instead of the resolved one.
 
     Returns:
         0 on success.
@@ -64,8 +63,7 @@ def export(
         raise UsageError(
             "export: choose at least one format, e.g. --perfetto trace.json or --markdown run.md"
         )
-    tree = tooling.find_build_tree(Path.cwd())
-    loaded = load_run(RunStore(resolve_store(store, build_dir=tree)), run, tree)
+    loaded = load_run(RunStore(store), run)
     report = build_report(loaded)
     if perfetto is not None:
         _write(perfetto, perfetto_trace.format_trace(loaded, report), "Perfetto trace")

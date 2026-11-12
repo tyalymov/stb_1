@@ -1,9 +1,8 @@
 """``longpole runs``: what the store holds.
 
-Without an action the command lists runs, newest last so the latest is
-where the eye lands at the bottom of a terminal. Inside a build tree it
-lists that tree's runs; ``--all`` lifts the filter. ``show`` prints one
-run's manifest, ``prune`` deletes old runs by count or by age.
+Without an action the command lists the runs in the store, newest last so
+the latest is where the eye lands at the bottom of a terminal. ``show``
+prints one run's manifest, ``prune`` deletes old runs by count or by age.
 """
 
 from __future__ import annotations
@@ -12,19 +11,17 @@ import logging
 import re
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Annotated
 
 from cyclopts import App, Parameter, Token
 
 from longpole import output
-from longpole.cmake import tooling
 from longpole.commands.options import Output, Store
 from longpole.errors import UsageError
 from longpole.exporters import terminal
 from longpole.model import Manifest, Run
 from longpole.output import OutputFormat
-from longpole.store import RunStore, RunSummary, resolve_store
+from longpole.store import RunStore, RunSummary
 
 log = logging.getLogger(__name__)
 
@@ -79,45 +76,33 @@ app = App(
 @app.default
 def list_runs(
     *,
-    all_trees: Annotated[bool, Parameter(name="--all")] = False,
+    store: Store,
     since: Age = None,
     label: str | None = None,
-    store: Store = None,
     output_format: Output = "text",
 ) -> int:
     """List the runs in the store, newest last.
 
-    Inside a build tree only that tree's runs are listed unless --all is given.
-
     Args:
-        all_trees: Inside a build tree, list every tree's runs instead of this tree's.
+        store: Run store to list.
         since: Only runs captured within AGE, e.g. 90m, 12h or 7d.
         label: Only runs carrying this label.
-        store: Run store to list instead of the resolved one.
         output_format: text, or json for a program.
 
     Returns:
         0.
     """
-    tree = tooling.find_build_tree(Path.cwd())
-    build_dir = tree.resolve() if tree is not None and not all_trees else None
-    return _list(
-        _store(store, tree),
-        build_dir=build_dir,
-        since=since,
-        label=label,
-        output_format=output_format,
-    )
+    return _list(RunStore(store), since=since, label=label, output_format=output_format)
 
 
 @app.command
-def show(run: str = "latest", /, *, store: Store = None, output_format: Output = "text") -> int:
+def show(run: str = "latest", /, *, store: Store, output_format: Output = "text") -> int:
     """Print one run's manifest.
 
     Args:
         run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
             or a dump path.
-        store: Run store to read instead of the resolved one.
+        store: Run store to read.
         output_format: text, or json for a program.
 
     Returns:
@@ -127,24 +112,23 @@ def show(run: str = "latest", /, *, store: Store = None, output_format: Output =
         UnknownRunError: The reference names no run.
         DumpFormatError: The run on disk is malformed.
     """
-    runs = _store(store, tooling.find_build_tree(Path.cwd()))
-    return _show(runs, run, output_format=output_format)
+    return _show(RunStore(store), run, output_format=output_format)
 
 
 @app.command
 def prune(
     *,
+    store: Store,
     keep: int | None = None,
     older_than: Age = None,
-    store: Store = None,
     output_format: Output = "text",
 ) -> int:
     """Delete old runs by count or by age.
 
     Args:
+        store: Run store to prune.
         keep: Keep only the N newest runs.
         older_than: Delete runs older than AGE, e.g. 90d.
-        store: Run store to prune instead of the resolved one.
         output_format: text, or json for a program.
 
     Returns:
@@ -155,27 +139,12 @@ def prune(
     """
     if keep is None and older_than is None:
         raise UsageError("runs prune: give --keep N, --older-than AGE, or both")
-    runs = _store(store, tooling.find_build_tree(Path.cwd()))
-    return _prune(runs, keep=keep, older_than=older_than, output_format=output_format)
-
-
-def _store(explicit: Path | None, tree: Path | None) -> RunStore:
-    """Open the store ``--store`` or the build tree points at.
-
-    Args:
-        explicit: ``--store``, if given.
-        tree: The build tree the working directory is in, or ``None``.
-
-    Returns:
-        The store.
-    """
-    return RunStore(resolve_store(explicit, build_dir=tree))
+    return _prune(RunStore(store), keep=keep, older_than=older_than, output_format=output_format)
 
 
 def _list(
     store: RunStore,
     *,
-    build_dir: Path | None,
     since: timedelta | None,
     label: str | None,
     output_format: OutputFormat,
@@ -184,7 +153,6 @@ def _list(
 
     Args:
         store: The store.
-        build_dir: Only runs of this tree, or ``None`` for every tree.
         since: Only runs captured within this long ago, or ``None``.
         label: Only runs carrying this label, or ``None``.
         output_format: Aligned lines, or JSON.
@@ -193,13 +161,13 @@ def _list(
         0.
     """
     cutoff = datetime.now(UTC) - since if since is not None else None
-    summaries = store.list(build_dir=build_dir, label=label, since=cutoff)
+    summaries = store.list(label=label, since=cutoff)
 
     def text(found: list[RunSummary]) -> str:
         if not found:
-            scope = f" from {build_dir}" if build_dir is not None else ""
-            return f"no runs{scope} in {store.root}"
-        return _catalogue(found, build_dir is not None)
+            return f"no runs in {store.root}"
+        trees = {summary.build_dir for summary in found}
+        return _catalogue(found, len(trees) == 1)
 
     output.result(summaries, output_format, text=text)
     return 0

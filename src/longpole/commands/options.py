@@ -9,14 +9,8 @@ from cyclopts import Parameter
 
 from longpole.output import OutputFormat
 
-Store = Annotated[
-    Path | None,
-    Parameter(
-        name="--store",
-        help="run store to use instead of the one resolved from the build tree and environment",
-    ),
-]
-"""``--store PATH``; ``None`` leaves the choice to :func:`longpole.store.resolve_store`."""
+Store = Annotated[Path, Parameter(name="--store", help="run store to read from and write to")]
+"""``--store PATH``, required everywhere: no command guesses where the runs are."""
 
 Output = Annotated[
     OutputFormat,

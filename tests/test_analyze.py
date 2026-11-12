@@ -58,7 +58,7 @@ def _store_with(tmp_path: Path, *runs: Run) -> Path:
 def test_json_defaults_to_the_newest_run_and_accepts_references(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Outside any build tree the default is the store's newest run; latest~1 and ids work too."""
+    """The default is the store's newest run; latest~1 and ids work too."""
     older = sample_run(run_id="20261031T120000Z-000001", created_at="2026-10-31T12:00:00+00:00")
     newer = sample_run(run_id="20261031T120100Z-000002", created_at="2026-10-31T12:01:00+00:00")
     store = _store_with(tmp_path, older, newer)
@@ -88,50 +88,10 @@ def test_top_limits_the_tables(tmp_path: Path, capsys: pytest.CaptureFixture[str
     assert len(report["sizes"]["largest"]) == 1
 
 
-def test_inside_a_build_tree_the_default_is_that_trees_newest_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """From inside a tree the newest run of that tree wins over a newer run from elsewhere."""
-    tree = tmp_path / "proj" / "build"
-    (tree / "CMakeFiles").mkdir(parents=True)
-    (tree / "CMakeCache.txt").write_text("", encoding="utf-8")
-    mine = sample_run(
-        run_id="20261031T120000Z-000001",
-        created_at="2026-10-31T12:00:00+00:00",
-        build_dir=str(tree.resolve()),
-    )
-    elsewhere = sample_run(
-        run_id="20261031T120100Z-000002",
-        created_at="2026-10-31T12:01:00+00:00",
-        build_dir="/somewhere/else/build",
-    )
-    store = _store_with(tmp_path, mine, elsewhere)
-
-    monkeypatch.chdir(tree / "CMakeFiles")
-    assert main(["analyze", "--store", str(store), "--output-format", "json"]) == 0
-    assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-000001"
-
-
-def test_tree_without_runs_is_an_error_not_a_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Inside a tree that has no runs the command refuses to show some other tree's build."""
-    tree = tmp_path / "build"
-    tree.mkdir()
-    (tree / "CMakeCache.txt").write_text("", encoding="utf-8")
-    store = _store_with(tmp_path, sample_run(build_dir="/somewhere/else/build"))
-    monkeypatch.chdir(tree)
-    assert main(["analyze", "--store", str(store)]) == 1
-    err = capsys.readouterr().err
-    assert f"no runs from {tree.resolve()}" in err
-    assert "longpole enable" in err
-
-
 def test_empty_store_is_an_error_with_a_hint(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """An empty store says so and points at enable; an unknown reference names itself."""
-    monkeypatch.chdir(tmp_path)
     assert main(["analyze", "--store", str(tmp_path / "store")]) == 1
     assert "no runs in" in capsys.readouterr().err
     store = _store_with(tmp_path, sample_run())

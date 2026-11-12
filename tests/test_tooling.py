@@ -10,7 +10,6 @@ from longpole.cmake.tooling import (
     CacheInfo,
     data_version_for_line,
     describe,
-    find_build_tree,
     read_cache,
 )
 from longpole.errors import CMakeToolError
@@ -88,13 +87,3 @@ def test_real_cache_names_the_configuring_cmake(built_chain: BuiltChain) -> None
     assert cache.source_dir is not None
     assert cache.source_dir.resolve() == built_chain.project.source_dir.resolve()
     assert cache.cmake_version == ".".join(map(str, built_chain.version))
-
-
-def test_find_build_tree_walks_up_to_the_cache(tmp_path: Path) -> None:
-    """The nearest ancestor with a CMakeCache.txt is the build tree; none means None."""
-    tree = tmp_path / "build"
-    (tree / "CMakeFiles" / "a.dir").mkdir(parents=True)
-    (tree / "CMakeCache.txt").write_text("", encoding="utf-8")
-    assert find_build_tree(tree / "CMakeFiles" / "a.dir") == tree
-    assert find_build_tree(tree) == tree
-    assert find_build_tree(tmp_path) is None

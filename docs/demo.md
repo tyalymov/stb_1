@@ -6,11 +6,11 @@ again when the output changes.
 
 ## What is recorded
 
-1. `longpole enable build` on a fresh tree of `tests/fixtures/chain`.
+1. `longpole enable build --store runs` on a fresh tree of `tests/fixtures/chain`.
 2. `cmake -S . -B build -G Ninja` and `cmake --build build`; the status line
    from the callback ends the build output.
-3. `cd build && longpole analyze`, paused on the critical path table.
-4. `longpole export --perfetto trace.json`, then the trace opened in
+3. `longpole analyze --store runs`, paused on the critical path table.
+4. `longpole export --store runs --perfetto trace.json`, then the trace opened in
    https://ui.perfetto.dev (a screenshot, not part of the terminal recording).
 
 Use a terminal 100 columns wide; the tables are laid out for that width.

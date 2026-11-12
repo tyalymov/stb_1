@@ -11,7 +11,7 @@ from longpole.cli import main
 from longpole.cmake import fileapi, tooling
 from longpole.commands import enable
 from longpole.model import DataVersion
-from longpole.store import IN_TREE, RunStore
+from longpole.store import RunStore
 from tests.conftest import cmake_version_of, make_project
 
 CAPTURE_HOOKS = [
@@ -54,7 +54,7 @@ def test_enable_writes_query_graph_request_and_store_marker(
 ) -> None:
     """Enabling a tree leaves exactly the files CMake and longpole need, with the right minor."""
     build = tmp_path / "build"
-    assert main(["enable", str(build)]) == 0
+    assert main(["enable", str(build), "--store", str(tmp_path / "store")]) == 0
 
     query = build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
     document = json.loads(query.read_text(encoding="utf-8"))
@@ -62,9 +62,8 @@ def test_enable_writes_query_graph_request_and_store_marker(
     assert expected_minor is not None
     assert document["version"] == {"major": 1, "minor": expected_minor.minor}
     assert document["hooks"] == CAPTURE_HOOKS
-    assert document["callbacks"] == [enable.callback_command(store=build / IN_TREE)]
+    assert document["callbacks"] == [enable.callback_command(store=tmp_path / "store")]
     assert fileapi.query_path(build).is_file()
-    assert (build / IN_TREE).is_dir()
 
     assert capsys.readouterr().out.startswith(f"enabled: {query}")
 
@@ -75,11 +74,12 @@ def test_enable_is_idempotent_and_json_reports_the_same_paths(
 ) -> None:
     """A second enable rewrites identical content; --json carries the paths as strings."""
     build = tmp_path / "build"
-    assert main(["enable", str(build)]) == 0
+    assert main(["enable", str(build), "--store", str(tmp_path / "store")]) == 0
     first = (build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json").read_bytes()
     capsys.readouterr()
 
-    assert main(["enable", str(build), "--output-format", "json"]) == 0
+    store = str(tmp_path / "store")
+    assert main(["enable", str(build), "--store", store, "--output-format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert Path(report["query"]).read_bytes() == first
     assert report["file_api_query"] == str(fileapi.query_path(build))
@@ -91,12 +91,11 @@ def test_disable_deletes_the_queries_but_keeps_the_store(
 ) -> None:
     """`disable` undoes `enable` except for the store, which may already hold runs."""
     build = tmp_path / "build"
-    assert main(["enable", str(build)]) == 0
+    assert main(["enable", str(build), "--store", str(tmp_path / "store")]) == 0
     assert main(["disable", str(build)]) == 0
     query = build / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
     assert not query.exists()
     assert not fileapi.query_path(build).exists()
-    assert (build / IN_TREE).is_dir()
     assert capsys.readouterr().out.splitlines()[-1] == f"removed {query}"
 
     assert main(["disable", str(build)]) == 0
@@ -105,17 +104,15 @@ def test_disable_deletes_the_queries_but_keeps_the_store(
 @pytest.mark.cmake
 @pytest.mark.slow
 def test_enable_with_label_and_store_records_there_with_the_label(
-    tmp_path: Path, cmake_on_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, cmake_on_path: Path
 ) -> None:
     """What enable was given reaches every run; an explicit store leaves no in-tree one."""
-    monkeypatch.delenv("LONGPOLE_STORE", raising=False)
     project = make_project("chain", tmp_path, cmake_on_path)
     store_dir = tmp_path / "my store"
     assert (
         main(["enable", str(project.build_dir), "--label", "nightly", "--store", str(store_dir)])
         == 0
     )
-    assert not (project.build_dir / IN_TREE).exists()
     project.configure()
     project.build()
 
@@ -130,7 +127,7 @@ def test_missing_cmake_is_a_warning_not_a_refusal(
     """No cmake on PATH: the query is still written, for data version 1.0, with a warning."""
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
     build = tmp_path / "build"
-    assert main(["enable", str(build)]) == 0
+    assert main(["enable", str(build), "--store", str(tmp_path / "store")]) == 0
     captured = capsys.readouterr()
     assert "WARNING: cannot run cmake" in captured.err
     assert captured.out.startswith("enabled: ")
@@ -152,7 +149,7 @@ def test_old_cmake_is_a_warning_not_a_refusal(
         )
 
     monkeypatch.setattr(tooling, "describe", describe)
-    assert main(["enable", str(tmp_path / "build")]) == 0
+    assert main(["enable", str(tmp_path / "build"), "--store", str(tmp_path / "store")]) == 0
     captured = capsys.readouterr()
     assert "WARNING: cmake is 3.31.9, older than 4.3" in captured.err
     assert captured.out.startswith("enabled: ")

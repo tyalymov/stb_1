@@ -2,8 +2,8 @@
 
 A store is a directory with ``runs/<run_id>/`` dumps, a ``runs.jsonl`` of
 one-line summaries for fast listing, and a ``latest`` file naming the newest
-run. Usually it lives inside the build tree (``<build>/.longpole``);
-:func:`resolve_store` applies one rule for every command and the callback.
+run. Every command gets its path explicitly through ``--store``; nothing
+looks for it in the environment or the working directory.
 
 A dump holds raw files and is parsed when read. The target graph of a build
 run comes from the configure before it: a ``postGenerate`` run keeps a copy
@@ -18,28 +18,19 @@ a path to a dump directory.
 from __future__ import annotations
 
 import json
-import os
 import re
 import secrets
 import shutil
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
-import platformdirs
-
 from longpole import dump
 from longpole.errors import UnknownRunError
 from longpole.jsonfields import FieldError, Fields, Json
 from longpole.model import Manifest, Run
-
-STORE_ENV = "LONGPOLE_STORE"
-"""Environment variable naming the store, second in precedence after an explicit path."""
-
-IN_TREE = ".longpole"
-"""Store directory name inside a build tree."""
 
 _LATEST_PATTERN = re.compile(r"^latest(?:~(\d+))?$")
 
@@ -117,39 +108,6 @@ def new_run_id(now: datetime | None = None) -> str:
     """
     moment = now if now is not None else datetime.now(UTC)
     return f"{moment.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
-
-
-def resolve_store(
-    explicit: Path | None = None,
-    *,
-    build_dir: Path | None = None,
-    environ: Mapping[str, str] | None = None,
-) -> Path:
-    """Decide which store a command or callback uses.
-
-    The rule, in order: an explicit path; the ``LONGPOLE_STORE`` variable; a
-    ``.longpole`` directory inside the given build tree; the user's central
-    data directory (``~/.local/share/longpole`` on Linux,
-    ``~/Library/Application Support/longpole`` on macOS). The directory need
-    not exist yet.
-
-    Args:
-        explicit: Path from ``--store``, if given.
-        build_dir: Build tree whose in-tree store applies, if it has one.
-        environ: Environment to read; defaults to the process environment.
-
-    Returns:
-        The store directory.
-    """
-    env = os.environ if environ is None else environ
-    if explicit is not None:
-        return explicit
-    configured = env.get(STORE_ENV)
-    if configured:
-        return Path(configured)
-    if build_dir is not None and (build_dir / IN_TREE).is_dir():
-        return build_dir / IN_TREE
-    return platformdirs.user_data_path("longpole")
 
 
 class RunStore:

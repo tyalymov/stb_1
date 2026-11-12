@@ -144,22 +144,6 @@ def read_cache(build_dir: Path) -> CacheInfo:
     )
 
 
-def find_build_tree(start: Path) -> Path | None:
-    """The build tree that contains a directory, if any.
-
-    Args:
-        start: A directory, typically the working directory.
-
-    Returns:
-        ``start`` or the nearest parent holding a ``CMakeCache.txt``, or
-        ``None`` when no parent is a configured build tree.
-    """
-    for candidate in (start, *start.parents):
-        if (candidate / "CMakeCache.txt").is_file():
-            return candidate
-    return None
-
-
 def data_version_for_line(version_tuple: tuple[int, int, int]) -> DataVersion | None:
     """Instrumentation data version a CMake release line writes, by convention.
 

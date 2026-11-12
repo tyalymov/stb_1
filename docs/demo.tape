@@ -12,12 +12,12 @@ Type "export DEMO=$(mktemp -d) && cp -r ../tests/fixtures/chain $DEMO/src && exp
 Enter
 Show
 
-Type "longpole enable build"
+Type "longpole enable build --store runs"
 Enter
 Sleep 1s
 Type "cmake -S src -B build -G Ninja > /dev/null && cmake --build build"
 Enter
 Sleep 3s
-Type "cd build && longpole analyze"
+Type "longpole analyze --store runs"
 Enter
 Sleep 4s

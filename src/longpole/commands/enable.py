@@ -8,8 +8,8 @@ callback after each configure, build, install, workflow and ctest run, and
 the callback stores the run.
 
 The command also plants a File API query, so the next configure answers
-with the target graph the critical path needs, and marks the tree as having
-its own run store. A tree that was configured before the query existed has
+with the target graph the critical path needs. A tree that was configured
+before the query existed has
 to be configured once more, since the launcher that records each step is
 written into the build system at generate time; ``analyze`` says so when
 it meets such a run.
@@ -27,7 +27,6 @@ from longpole.cmake import fileapi, tooling
 from longpole.commands.options import Output, Store
 from longpole.errors import CMakeToolError
 from longpole.model import DataVersion
-from longpole.store import IN_TREE
 
 log = logging.getLogger(__name__)
 
@@ -51,22 +50,22 @@ def enable(
     build_dir: Path,
     /,
     *,
+    store: Store,
     label: tuple[str, ...] = (),
-    store: Store = None,
     output_format: Output = "text",
 ) -> int:
     """Switch CMake instrumentation on for a build tree.
 
     Write the query file that makes CMake record every step and call
-    'longpole capture' afterwards, ask the File API for the target graph,
-    and mark the tree as having its own run store. Labels and a store given
-    here are written into the callback, so every run it records carries
-    them. Nothing in the project changes. 'longpole disable' undoes it.
+    'longpole capture' afterwards, and ask the File API for the target
+    graph. The store and any labels are written into the callback, so every
+    run it records goes there and carries them. Nothing in the project
+    changes. 'longpole disable' undoes it.
 
     Args:
         build_dir: Build tree to instrument; may not exist yet.
+        store: Run store the callback writes to.
         label: Label every recorded run; may be repeated.
-        store: Run store the callback writes to; without it, <build>/.longpole.
         output_format: text, or json for a program.
 
     Returns:
@@ -80,9 +79,7 @@ def enable(
     return 0
 
 
-def write_query(
-    build_dir: Path, *, labels: tuple[str, ...] = (), store: Path | None = None
-) -> EnableResult:
+def write_query(build_dir: Path, *, store: Path, labels: tuple[str, ...] = ()) -> EnableResult:
     """Write the query file for a build tree.
 
     The ``cmake`` on PATH is asked which data version it writes, so the query
@@ -90,14 +87,12 @@ def write_query(
     whole). No ``cmake``, or one older than 4.3, is a warning, not an error:
     the file is written for data version 1.0 and starts working as soon as a
     CMake that knows the API builds the tree. Writing the same file again is
-    harmless. The File API query is planted as well, and the in-tree store
-    directory unless ``store`` points elsewhere. The callback gets the store
-    on its command line either way; it never has to work one out.
+    harmless. The File API query is planted as well.
 
     Args:
         build_dir: The tree.
+        store: Store the callback writes to.
         labels: Labels the callback attaches to every run.
-        store: Store the callback writes to, or ``None`` for ``<build>/.longpole``.
 
     Returns:
         What was written.
@@ -106,8 +101,7 @@ def write_query(
         OSError: A directory cannot be created or a file written.
     """
     data_version = _requested_data_version()
-    target = store if store is not None else build_dir / IN_TREE
-    callback = callback_command(labels=labels, store=target)
+    callback = callback_command(store=store, labels=labels)
     query = query_location(build_dir)
     query.parent.mkdir(parents=True, exist_ok=True)
     document = query_document(data_version, callback)
@@ -115,8 +109,6 @@ def write_query(
     log.info("wrote %s", query)
 
     file_api_query = fileapi.write_query(build_dir)
-    if store is None:  # an in-tree store would shadow the one the callback writes to
-        (build_dir / IN_TREE).mkdir(parents=True, exist_ok=True)
     return EnableResult(query=query, callback=callback, file_api_query=file_api_query)
 
 

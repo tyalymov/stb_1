@@ -13,7 +13,7 @@ from longpole.cmake import fileapi, snippets
 from longpole.env import collect
 from longpole.errors import DumpFormatError, SnippetFormatError, UnknownRunError
 from longpole.model import DataVersion, Manifest, Run
-from longpole.store import IN_TREE, STORE_ENV, RunStore, RunSummary, new_run_id, resolve_store
+from longpole.store import RunStore, RunSummary, new_run_id
 from tests.conftest import BuiltChain
 from tests.support.runs import raw_files, sample_run, write_run
 
@@ -257,24 +257,6 @@ def test_prune_by_age_uses_the_capture_time(tmp_path: Path) -> None:
     assert store.prune(older_than=timedelta(seconds=-1)) == [recent.manifest.run_id]
     assert store.latest() is None
     assert not (tmp_path / "store" / "latest").exists()
-
-
-def test_store_resolution_follows_the_documented_precedence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Explicit path, then the environment, then an in-tree store, then the user directory."""
-    build = tmp_path / "build"
-    (build / IN_TREE).mkdir(parents=True)
-    monkeypatch.delenv(STORE_ENV, raising=False)
-
-    assert resolve_store(tmp_path / "explicit", build_dir=build) == tmp_path / "explicit"
-    assert resolve_store(build_dir=build) == build / IN_TREE
-    assert resolve_store(build_dir=tmp_path / "no-store") != tmp_path / "no-store" / IN_TREE
-    assert resolve_store(build_dir=None).name == "longpole"
-
-    monkeypatch.setenv(STORE_ENV, str(tmp_path / "from-env"))
-    assert resolve_store(build_dir=build) == tmp_path / "from-env"
-    assert resolve_store(tmp_path / "explicit", build_dir=build) == tmp_path / "explicit"
 
 
 @pytest.mark.cmake

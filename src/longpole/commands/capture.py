@@ -20,12 +20,10 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
-
-from cyclopts import Parameter
 
 from longpole import __version__, env, output
 from longpole.cmake import fileapi
+from longpole.commands.options import Store
 from longpole.errors import IndexFormatError
 from longpole.jsonfields import FieldError, Fields, load_object
 from longpole.model import Manifest
@@ -38,7 +36,7 @@ def capture(
     index: Path,
     /,
     *,
-    store: Annotated[Path, Parameter(name="--store", help="run store to write the run to")],
+    store: Store,
     label: tuple[str, ...] = (),
 ) -> int:
     """Store the run an instrumentation index describes; CMake runs this at each hook.

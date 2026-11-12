@@ -116,10 +116,11 @@ The rules behind that shape:
   as `--store` and `--output-format`, are `Annotated` aliases in
   `commands/options.py`, so their names and help text are written once and
   each command that takes one says so in its signature. There is no shared
-  configuration object: a command gets everything it needs as parameters,
-  and reads the environment (`os.environ`, `Path.cwd()`) itself where that
-  is the point, as `resolve_store` does for `LONGPOLE_STORE`. `cli.py`
-  registers the commands on the module-level `app`.
+  configuration object and no implicit input: a command gets everything it
+  needs as parameters, and does not read environment variables or the
+  working directory to fill one in. `--store` is required wherever a store
+  is used; a CI action supplies it. `cli.py` registers the commands on the
+  module-level `app`.
 - Errors are a small hierarchy under `LongpoleError`. Low-level exceptions
   are wrapped at the layer boundary with a message a user can act on. `main`
   does not tell them apart: every exception is one `ERROR:` line on stderr

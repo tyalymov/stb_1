@@ -122,7 +122,6 @@ source = { editable = "." }
 dependencies = [
     { name = "cyclopts" },
     { name = "jsonschema" },
-    { name = "platformdirs" },
     { name = "rich" },
     { name = "zstandard" },
 ]
@@ -140,7 +139,6 @@ dev = [
 requires-dist = [
     { name = "cyclopts", specifier = ">=5.3" },
     { name = "jsonschema", specifier = ">=4.26.0" },
-    { name = "platformdirs", specifier = ">=4.14.0" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "zstandard", specifier = ">=0.25.0" },
 ]
