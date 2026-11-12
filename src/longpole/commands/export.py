@@ -17,7 +17,7 @@ from cyclopts import Parameter
 from longpole import output
 from longpole.analyzers.report import build_report
 from longpole.commands.analyze import load_run
-from longpole.commands.options import Store
+from longpole.commands.options import DEFAULT_STORE, Store
 from longpole.errors import UsageError
 from longpole.exporters import markdown as markdown_snapshot
 from longpole.exporters import perfetto as perfetto_trace
@@ -32,7 +32,7 @@ def export(
     run: str | None = None,
     /,
     *,
-    store: Store,
+    store: Store = DEFAULT_STORE,
     perfetto: Annotated[str | None, Parameter(metavar="PATH", allow_leading_hyphen=True)] = None,
     markdown: Annotated[str | None, Parameter(metavar="PATH", allow_leading_hyphen=True)] = None,
 ) -> int:

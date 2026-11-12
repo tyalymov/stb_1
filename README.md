@@ -34,12 +34,13 @@ builds; `longpole enable` warns when the CMake on PATH is older.
 
 ## Use
 
-Turn recording on once, then build as you always do. Every command takes
-the run store explicitly; nothing is guessed from the environment or the
-working directory:
+Turn recording on once, then build as you always do. Runs go to the store
+given with `--store`; locally it defaults to `.longpole` in the current
+directory, so run the commands from the same place (and add `.longpole/` to
+your `.gitignore`):
 
 ```sh
-longpole enable build --store runs    # before you configure the tree
+longpole enable build        # before you configure the tree
 
 cmake -S . -B build -G Ninja
 cmake --build build
@@ -54,7 +55,7 @@ longpole: postCMakeBuild recorded as 20261031T140557Z-5d3136: 100 snippets (long
 Then look at it:
 
 ```sh
-longpole analyze --store runs
+longpole analyze
 ```
 
 Here is {fmt}, the formatting library, built from scratch with Ninja on a
@@ -156,13 +157,13 @@ a custom command that depends on another target's output.
 Other commands:
 
 ```sh
-longpole runs --store runs                          # every run, oldest first
-longpole runs --store runs --since 7d               # last week only
-longpole runs show latest~1 --store runs            # the manifest of the run before the last
-longpole runs prune --keep 20 --store runs          # drop old runs
-longpole export --store runs --perfetto trace.json  # open the timeline in https://ui.perfetto.dev
-longpole export --store runs --markdown run.md      # a snapshot for a CI job summary
-longpole analyze --store runs --output-format json  # everything above as JSON
+longpole runs                          # every run, oldest first
+longpole runs --since 7d               # last week only
+longpole runs show latest~1            # the manifest of the run before the last
+longpole runs prune --keep 20          # drop old runs
+longpole export --perfetto trace.json  # open the timeline in https://ui.perfetto.dev
+longpole export --markdown run.md      # a snapshot for a CI job summary
+longpole analyze --output-format json  # everything above as JSON
 ```
 
 A run reference is an id or a prefix of one, `latest`, `latest~N`,
@@ -179,7 +180,8 @@ when a run is read, so a dump written by an older longpole still reads with
 a newer one. The layout is described in
 [docs/dump-format.md](docs/dump-format.md).
 
-Runs live in the store you gave `enable --store`. The store and any
+Runs live in the store `enable` was given, `./.longpole` by default. The
+store, made absolute, and any
 `enable --label NAME` are written into the callback itself, so the callback
 never has to work out where to write and a CI job can say once where its
 runs go and how they are tagged:

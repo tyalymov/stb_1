@@ -24,7 +24,7 @@ from pathlib import Path
 
 from longpole import output
 from longpole.cmake import fileapi, tooling
-from longpole.commands.options import Output, Store
+from longpole.commands.options import DEFAULT_STORE, Output, Store
 from longpole.errors import CMakeToolError
 from longpole.model import DataVersion
 
@@ -50,7 +50,7 @@ def enable(
     build_dir: Path,
     /,
     *,
-    store: Store,
+    store: Store = DEFAULT_STORE,
     label: tuple[str, ...] = (),
     output_format: Output = "text",
 ) -> int:

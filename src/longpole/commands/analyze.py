@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from longpole import output
 from longpole.analyzers.report import build_report, to_json
-from longpole.commands.options import Output, Store
+from longpole.commands.options import DEFAULT_STORE, Output, Store
 from longpole.errors import UnknownRunError
 from longpole.exporters import terminal
 from longpole.model import Run
@@ -22,7 +22,7 @@ def analyze(
     run: str | None = None,
     /,
     *,
-    store: Store,
+    store: Store = DEFAULT_STORE,
     top: int = DEFAULT_TOP,
     output_format: Output = "text",
 ) -> int:

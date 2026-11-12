@@ -16,7 +16,7 @@ from typing import Annotated
 from cyclopts import App, Parameter, Token
 
 from longpole import output
-from longpole.commands.options import Output, Store
+from longpole.commands.options import DEFAULT_STORE, Output, Store
 from longpole.errors import UsageError
 from longpole.exporters import terminal
 from longpole.model import Manifest, Run
@@ -76,7 +76,7 @@ app = App(
 @app.default
 def list_runs(
     *,
-    store: Store,
+    store: Store = DEFAULT_STORE,
     since: Age = None,
     label: str | None = None,
     output_format: Output = "text",
@@ -96,7 +96,9 @@ def list_runs(
 
 
 @app.command
-def show(run: str = "latest", /, *, store: Store, output_format: Output = "text") -> int:
+def show(
+    run: str = "latest", /, *, store: Store = DEFAULT_STORE, output_format: Output = "text"
+) -> int:
     """Print one run's manifest.
 
     Args:
@@ -118,7 +120,7 @@ def show(run: str = "latest", /, *, store: Store, output_format: Output = "text"
 @app.command
 def prune(
     *,
-    store: Store,
+    store: Store = DEFAULT_STORE,
     keep: int | None = None,
     older_than: Age = None,
     output_format: Output = "text",

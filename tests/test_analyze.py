@@ -78,6 +78,19 @@ def test_json_defaults_to_the_newest_run_and_accepts_references(
     assert report["utilization"]["peak_parallelism"] == 1
 
 
+def test_without_store_the_local_default_is_used(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """For local work --store may be left out; the runs are then in ./.longpole."""
+    store = RunStore(tmp_path / ".longpole")
+    write_run(store, sample_run())
+    monkeypatch.chdir(tmp_path)
+    assert main(["analyze", "--output-format", "json"]) == 0
+    assert json.loads(capsys.readouterr().out)["summary"]["run_id"] == "20261031T120000Z-abc123"
+    assert main(["runs", "--output-format", "json"]) == 0
+    assert len(json.loads(capsys.readouterr().out)) == 1
+
+
 def test_top_limits_the_tables(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """--top caps every slowest-items table."""
     store = _store_with(tmp_path, sample_run())

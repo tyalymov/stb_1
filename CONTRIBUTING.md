@@ -118,9 +118,10 @@ The rules behind that shape:
   each command that takes one says so in its signature. There is no shared
   configuration object and no implicit input: a command gets everything it
   needs as parameters, and does not read environment variables or the
-  working directory to fill one in. `--store` is required wherever a store
-  is used; a CI action supplies it. `cli.py` registers the commands on the
-  module-level `app`.
+  working directory to fill one in. `--store` defaults to a fixed relative
+  path, `.longpole`, for local work; a CI action passes it explicitly.
+  `capture` alone requires it, since `enable` always writes it into the
+  callback. `cli.py` registers the commands on the module-level `app`.
 - Errors are a small hierarchy under `LongpoleError`. Low-level exceptions
   are wrapped at the layer boundary with a message a user can act on. `main`
   does not tell them apart: every exception is one `ERROR:` line on stderr

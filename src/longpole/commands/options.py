@@ -9,8 +9,14 @@ from cyclopts import Parameter
 
 from longpole.output import OutputFormat
 
-Store = Annotated[Path, Parameter(name="--store", help="run store to read from and write to")]
-"""``--store PATH``, required everywhere: no command guesses where the runs are."""
+DEFAULT_STORE = Path(".longpole")
+"""Where runs go for local work when ``--store`` is not given; CI passes the path explicitly."""
+
+Store = Annotated[
+    Path,
+    Parameter(name="--store", help="run store to read from and write to (default: ./.longpole)"),
+]
+"""``--store PATH``; the commands default it to :data:`DEFAULT_STORE`, nothing else is guessed."""
 
 Output = Annotated[
     OutputFormat,
