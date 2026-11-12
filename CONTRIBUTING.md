@@ -124,8 +124,7 @@ The rules behind that shape:
   are wrapped at the layer boundary with a message a user can act on. `main`
   does not tell them apart: every exception is one `ERROR:` line on stderr
   and exit code 1, with the traceback added at `--log-level debug`. A
-  command that wants another code returns it, as `doctor` returns 1 when
-  something needs fixing.
+  command that wants another code returns it.
 - The module docstring of an entry module is the `--help` output, verbatim.
   A test compares the two, with the help rendered at a fixed width so the
   text does not depend on the terminal; `scripts/sync-cli-help.py`

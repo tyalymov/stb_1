@@ -1,10 +1,8 @@
 """Ask the ``cmake`` executable and a build tree's cache about themselves.
 
-Three facts drive everything else: which data version a given CMake writes
-(to request the right query minor), where the user-level configuration
-directory is (to enable instrumentation machine-wide), and which generator
-and which ``cmake`` a build tree was configured with (to report and to find
-the matching binary from inside a callback).
+Two facts drive everything else: which data version a given CMake writes
+(to request the right query minor), and which generator and CMake version a
+build tree was configured with (to record with each run).
 """
 
 from __future__ import annotations
@@ -12,7 +10,6 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -117,31 +114,6 @@ def describe(cmake: Path, *, timeout: float = 30.0) -> CMakeInfo:
     )
 
 
-def config_dir(cmake: Path, *, timeout: float = 30.0) -> Path:
-    """Run ``cmake --print-config-dir`` to find the user-level configuration directory.
-
-    Query files under ``<config dir>/instrumentation/v1/query/`` apply to
-    every build on the machine. CMake prints the path with each space
-    preceded by a backslash (``~/Library/Application Support/CMake`` comes
-    out escaped on macOS); the escaping is undone here.
-
-    Args:
-        cmake: The executable to ask; the directory does not depend on the
-            version, but asking is more robust than guessing per platform.
-        timeout: Seconds to wait for it.
-
-    Returns:
-        The configuration directory. It may not exist yet.
-
-    Raises:
-        CMakeToolError: The binary cannot run, exits non-zero or times out.
-    """
-    output = _run(cmake, "--print-config-dir", timeout=timeout).strip()
-    if not output:
-        raise CMakeToolError(f"{cmake} --print-config-dir printed nothing")
-    return Path(output.replace("\\ ", " "))
-
-
 def read_cache(build_dir: Path) -> CacheInfo:
     """Read generator, configuring ``cmake`` and source directory from ``CMakeCache.txt``.
 
@@ -186,71 +158,6 @@ def find_build_tree(start: Path) -> Path | None:
         if (candidate / "CMakeCache.txt").is_file():
             return candidate
     return None
-
-
-def query_files(build_dir: Path, *, config_dir: Path | None = None) -> tuple[Path, ...]:
-    """Instrumentation query files that apply to a build tree.
-
-    Args:
-        build_dir: The build tree; its own ``.cmake/instrumentation/v1/query``
-            is searched, including CMake's ``generated`` subdirectory.
-        config_dir: The user-level configuration directory, whose queries
-            apply to every tree; skipped when ``None``.
-
-    Returns:
-        Existing ``*.json`` files, tree first, sorted within each place.
-    """
-    places = [build_dir / ".cmake" / "instrumentation" / "v1" / "query"]
-    if config_dir is not None:
-        places.append(config_dir / "instrumentation" / "v1" / "query")
-    found: list[Path] = []
-    for place in places:
-        if place.is_dir():
-            found.extend(sorted(place.glob("*.json")))
-            found.extend(sorted((place / "generated").glob("*.json")))
-    return tuple(found)
-
-
-def last_generate_time(build_dir: Path) -> float | None:
-    """When the build system of a tree was last generated.
-
-    ``CMakeFiles/cmake.check_cache`` is rewritten by every generate of the
-    Makefile and Ninja generators; ``CMakeCache.txt`` is not touched when a
-    reconfigure changes nothing, so it only serves as a fallback.
-
-    Args:
-        build_dir: The build tree.
-
-    Returns:
-        Modification time as seconds since the epoch, or ``None`` for a tree
-        that was never configured.
-    """
-    for marker in (build_dir / "CMakeFiles" / "cmake.check_cache", build_dir / "CMakeCache.txt"):
-        if marker.is_file():
-            return marker.stat().st_mtime
-    return None
-
-
-def generated_before(build_dir: Path, queries: Iterable[Path]) -> bool:
-    """Whether the build system predates the newest of the given query files.
-
-    The launcher that records compile, link and custom steps is written
-    into the build system at generate time, so a query newer than the last
-    generate is only half in effect until the next ``cmake`` run.
-
-    Args:
-        build_dir: The build tree.
-        queries: Query files that apply to it.
-
-    Returns:
-        ``True`` when the tree is configured and at least one query file is
-        newer than its last generate; ``False`` for an unconfigured tree or
-        no queries.
-    """
-    generated_at = last_generate_time(build_dir)
-    if generated_at is None:
-        return False
-    return any(query.stat().st_mtime > generated_at for query in queries if query.is_file())
 
 
 def data_version_for_line(version_tuple: tuple[int, int, int]) -> DataVersion | None:

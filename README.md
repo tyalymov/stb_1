@@ -30,7 +30,7 @@ pip install git+https://github.com/tyalymov/longpole
 ```
 
 You need Python 3.11 or newer and CMake 4.3 or newer on the machine that
-builds. `longpole doctor` checks both.
+builds; `longpole enable` warns when the CMake on PATH is older.
 
 ## Use
 
@@ -159,7 +159,6 @@ longpole runs                          # every run of this tree, oldest first
 longpole runs --all --since 7d         # every tree, last week
 longpole runs show latest~1            # the manifest of the run before the last
 longpole runs prune --keep 20          # drop old runs
-longpole doctor build                  # is this tree recording, and if not, why
 longpole export --perfetto trace.json  # open the timeline in https://ui.perfetto.dev
 longpole export --markdown run.md      # a snapshot for a CI job summary
 longpole analyze --output-format json  # everything above as JSON
@@ -198,8 +197,8 @@ longpole enable build --store "$RUNNER_TEMP/longpole" --label "ci:$GITHUB_RUN_ID
   the command launcher those generators have; Visual Studio and Xcode have
   none, so CMake records nothing there.
 - A tree configured before you ran `enable` records only the outer build
-  step, and no target graph, until you run `cmake` on it again; `doctor`
-  tells you when that is the case, and so does `analyze`.
+  step, and no target graph, until you run `cmake` on it again; `analyze`
+  tells you when that is the case.
 - Within a target, compile steps and independent custom commands are taken
   to run in parallel and link steps one after another. That is exact for
   the usual shapes and never worse than the sum of the target's steps.

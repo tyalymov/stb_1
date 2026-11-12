@@ -11,8 +11,8 @@ The command also plants a File API query, so the next configure answers
 with the target graph the critical path needs, and marks the tree as having
 its own run store. A tree that was configured before the query existed has
 to be configured once more, since the launcher that records each step is
-written into the build system at generate time; ``analyze`` and ``doctor``
-say so when they meet such a run.
+written into the build system at generate time; ``analyze`` says so when
+it meets such a run.
 """
 
 from __future__ import annotations
@@ -197,8 +197,8 @@ def callback_command(*, store: Path, labels: tuple[str, ...] = ()) -> str:
 
     The command is ``longpole capture``, resolved on the PATH of whatever
     runs ``cmake``; an IDE or runner whose PATH lacks it gets a bare ``no
-    such file or directory`` from CMake and records nothing, which is for
-    ``doctor`` to point out. The store and the labels go on the command line,
+    such file or directory`` from CMake and records nothing. The store and
+    the labels go on the command line,
     since the callback gets nothing else from the shell that enabled
     recording; the store is made absolute for the same reason.
 

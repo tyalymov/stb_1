@@ -8,7 +8,6 @@ as a run, and shows what actually gated it.
 │ analyze      Report on a run: totals, phases, slowest items, critical path, parallelism, sizes.  │
 │ capture      Store the run an instrumentation index describes; CMake runs this at each hook.     │
 │ disable      Switch CMake instrumentation off for a build tree.                                  │
-│ doctor       Check whether a build tree records its builds, and say what to fix if not.          │
 │ enable       Switch CMake instrumentation on for a build tree.                                   │
 │ export       Write a run as a Perfetto trace or a Markdown snapshot.                             │
 │ runs         List stored runs; 'runs show' prints one, 'runs prune' deletes old ones.            │
@@ -31,7 +30,7 @@ from cyclopts import App, Parameter
 from rich.console import Console
 
 from longpole import __version__
-from longpole.commands import analyze, capture, disable, doctor, enable, export, runs
+from longpole.commands import analyze, capture, disable, enable, export, runs
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +53,6 @@ app = App(
 app.command(enable.enable)
 app.command(disable.disable)
 app.command(capture.capture)
-app.command(doctor.doctor)
 app.command(analyze.analyze)
 app.command(export.export)
 app.command(runs.app)
