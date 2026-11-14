@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import tempfile
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from longpole.cmake import fileapi, snippets
@@ -241,7 +242,7 @@ def run_from_capture(capture: CapturedIndex, build_dir: Path) -> Run:
     reply = fileapi.read_reply(fileapi.reply_dir(build_dir))
     return Run(
         manifest=Manifest(
-            run_id=new_run_id(),
+            run_id=new_run_id(datetime.now(UTC)),
             created_at="2026-10-31T12:00:00+00:00",
             tool_version="test",
             hook=index.hook,

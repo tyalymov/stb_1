@@ -93,17 +93,16 @@ class RunSummary:
         return cls.of(manifest, len(dump.read_index(directory).snippet_paths))
 
 
-def new_run_id(now: datetime | None = None) -> str:
+def new_run_id(now: datetime) -> str:
     """Make a run id that sorts by capture time.
 
     Args:
-        now: Capture time; defaults to the current UTC time.
+        now: Capture time, in UTC; the caller also stores it as ``created_at``.
 
     Returns:
         ``YYYYMMDDTHHMMSSZ-xxxxxx`` with six random hex digits.
     """
-    moment = now if now is not None else datetime.now(UTC)
-    return f"{moment.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
+    return f"{now.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
 
 
 class RunStore:

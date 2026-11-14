@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -279,7 +280,7 @@ def chain_run(built_chain: BuiltChain) -> Run:
     assert reply is not None
     return Run(
         manifest=Manifest(
-            run_id=new_run_id(),
+            run_id=new_run_id(datetime.now(UTC)),
             created_at="2026-10-31T12:00:00+00:00",
             tool_version="test",
             hook=index.hook,

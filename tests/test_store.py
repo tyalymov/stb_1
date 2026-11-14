@@ -262,7 +262,7 @@ def test_a_real_capture_round_trips_through_the_store(
         capture.directory / "index.json", data_dir=capture.directory / "snippets"
     )
     manifest = Manifest(
-        run_id=new_run_id(),
+        run_id=new_run_id(datetime.now(UTC)),
         created_at=datetime.now(UTC).isoformat(),
         tool_version="test",
         hook=index.hook,
