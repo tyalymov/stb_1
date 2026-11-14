@@ -11,7 +11,7 @@ of the File API reply, and :meth:`RunStore.read` finds the newest such copy
 for the same tree captured no later than the run being read.
 
 Runs are addressed by references: a full or prefix id, ``latest``,
-``latest~N``, ``sha:<prefix>`` of the captured commit, ``label:<name>``, or
+``latest~N``, ``label:<name>``, or
 a path to a dump directory.
 """
 
@@ -44,7 +44,6 @@ class RunSummary:
         created_at: Capture time, ISO 8601 UTC.
         hook: Hook that produced the run.
         build_dir: Build tree the run came from.
-        git_sha: Commit of the sources, or ``None``.
         labels: The run's labels.
         step_count: Number of snippets the index listed.
     """
@@ -53,7 +52,6 @@ class RunSummary:
     created_at: str
     hook: str
     build_dir: str
-    git_sha: str | None
     labels: tuple[str, ...]
     step_count: int
 
@@ -68,13 +66,11 @@ class RunSummary:
         Returns:
             Its summary.
         """
-        git = manifest.environment.git
         return cls(
             run_id=manifest.run_id,
             created_at=manifest.created_at,
             hook=manifest.hook,
             build_dir=manifest.build_dir,
-            git_sha=git.sha if git is not None else None,
             labels=manifest.labels,
             step_count=step_count,
         )
@@ -238,7 +234,7 @@ class RunStore:
         """Turn a run reference into the dump directory it names.
 
         Args:
-            ref: ``latest``, ``latest~N``, ``sha:<prefix>``, ``label:<name>``,
+            ref: ``latest``, ``latest~N``, ``label:<name>``,
                 a path to a dump directory, or a run id or unique prefix of one.
 
         Returns:
@@ -260,12 +256,6 @@ class RunStore:
             if back >= len(summaries):
                 raise UnknownRunError(f"{ref}: the store has only {len(summaries)} run(s)")
             return self.runs_dir / newest_first[back].run_id
-        if ref.startswith("sha:"):
-            prefix = ref[len("sha:") :]
-            for summary in newest_first:
-                if summary.git_sha and summary.git_sha.startswith(prefix):
-                    return self.runs_dir / summary.run_id
-            raise UnknownRunError(f"no run captured at a commit starting with {prefix!r}")
         if ref.startswith("label:"):
             wanted = ref[len("label:") :]
             for summary in newest_first:
@@ -444,7 +434,6 @@ class RunStore:
                     created_at=fields.string("created_at"),
                     hook=fields.string("hook"),
                     build_dir=fields.string("build_dir"),
-                    git_sha=fields.optional_string("git_sha"),
                     labels=fields.strings("labels"),
                     step_count=fields.integer("step_count"),
                 )

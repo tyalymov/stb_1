@@ -4,7 +4,7 @@ CMake calls it with the path of an index file and deletes that index and
 every snippet it lists as soon as all callbacks have returned. So this
 command copies: the index, the snippets and, after a configure, the File
 API reply, plus a manifest with what is only knowable now (time, labels,
-git state, ccache counters). From the index it takes only what the copy
+ccache counters). From the index it takes only what the copy
 needs: which files, which tree, which hook; the vendored schema is not
 consulted, since a CMake newer than it writes a data minor it forbids and
 the data must be stored all the same. It runs no ``cmake``; everything else

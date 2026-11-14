@@ -272,21 +272,6 @@ class SystemInfo:
 
 
 @dataclass(frozen=True, kw_only=True)
-class GitInfo:
-    """State of the source checkout when the run was captured.
-
-    Attributes:
-        sha: Full commit hash of ``HEAD``.
-        branch: Current branch, or ``None`` on a detached head.
-        dirty: Whether tracked files had uncommitted changes.
-    """
-
-    sha: str
-    branch: str | None
-    dirty: bool
-
-
-@dataclass(frozen=True, kw_only=True)
 class Toolchain:
     """Compiler CMake selected for one language, from the File API ``toolchains`` reply.
 
@@ -311,14 +296,12 @@ class Environment:
         cmake_version: Version of the CMake that configured the tree, from its cache.
         generator: CMake generator of the build tree, e.g. ``Ninja``.
         cpu_count: Logical CPUs visible to longpole when it captured the run.
-        git: Checkout state, or ``None`` outside a git repository.
         ccache: ``ccache`` statistics as key/value text, or ``None`` without ccache.
     """
 
     cmake_version: str | None
     generator: str | None
     cpu_count: int | None
-    git: GitInfo | None
     ccache: dict[str, str] | None = None
 
 
@@ -337,7 +320,7 @@ class Manifest:
             two spellings of one directory compare equal (``/var`` and
             ``/private/var`` on macOS).
         environment: Machine and checkout state.
-        labels: Free-form tags, e.g. ``ci:<run id>`` or a user label.
+        labels: Free-form tags the caller passed, e.g. ``sha:<commit>``.
     """
 
     format_version: int = DUMP_FORMAT_VERSION

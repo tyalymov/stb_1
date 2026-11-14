@@ -19,7 +19,7 @@ from longpole import output
 from longpole.commands.options import DEFAULT_STORE, Output, Store
 from longpole.errors import UsageError
 from longpole.exporters import terminal
-from longpole.model import Manifest, Run
+from longpole.model import Run
 from longpole.output import OutputFormat
 from longpole.store import RunStore, RunSummary
 
@@ -102,7 +102,7 @@ def show(
     """Print one run's manifest.
 
     Args:
-        run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
+        run: Run id or prefix, latest, latest~N, label:<name>,
             or a dump path.
         store: Run store to read.
         output_format: text, or json for a program.
@@ -178,7 +178,7 @@ def _list(
 def _catalogue(summaries: list[RunSummary], one_tree: bool) -> str:
     """The listing as aligned lines.
 
-    A table with seven columns does not fit a terminal without truncating
+    A table with six columns does not fit a terminal without truncating
     ids or paths, so each run is one line of fixed-width fields, and the
     build directory, when the listing spans several trees, follows on an
     indented line of its own where it can be as long as it needs to be.
@@ -199,7 +199,6 @@ def _catalogue(summaries: list[RunSummary], one_tree: bool) -> str:
             summary.run_id,
             _when(summary.created_at),
             summary.hook.ljust(hook_width),
-            (summary.git_sha[:7] if summary.git_sha else "-").ljust(7),
             f"{summary.step_count:>5} steps",
         ]
         if summary.labels:
@@ -282,33 +281,12 @@ def _manifest_table(loaded: Run) -> str:
         ("cmake", environment.cmake_version or ""),
         ("generator", environment.generator or ""),
         ("cores", str(environment.cpu_count) if environment.cpu_count is not None else ""),
-        ("git", _git_line(manifest)),
         ("labels", ", ".join(manifest.labels)),
         ("steps", str(len(loaded.steps))),
         ("graph", "yes" if loaded.graph is not None else "no"),
         ("longpole", manifest.tool_version),
     ]
     return terminal.render(terminal.table(None, ("", ""), rows, show_header=False))
-
-
-def _git_line(manifest: Manifest) -> str:
-    """Describe the checkout of a run in one cell.
-
-    Args:
-        manifest: The run's manifest.
-
-    Returns:
-        ``sha branch`` with ``(dirty)`` when applicable; empty outside git.
-    """
-    git = manifest.environment.git
-    if git is None:
-        return ""
-    text = git.sha[:12]
-    if git.branch:
-        text += f" {git.branch}"
-    if git.dirty:
-        text += " (dirty)"
-    return text
 
 
 def _prune(

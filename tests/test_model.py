@@ -54,7 +54,7 @@ def _run(*steps: Step) -> Run:
         tool_version="0.0.1.dev0",
         hook="postCMakeBuild",
         build_dir="/tmp/build",
-        environment=Environment(cmake_version=None, generator=None, cpu_count=None, git=None),
+        environment=Environment(cmake_version=None, generator=None, cpu_count=None),
     )
     return Run(manifest=manifest, data_version=DataVersion(major=1, minor=2), steps=steps)
 

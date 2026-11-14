@@ -39,7 +39,6 @@ random hex digits.
 | `cmake_version` | string or null | Version of the CMake that configured the tree, from its cache. |
 | `generator` | string or null | Generator of the build tree. |
 | `cpu_count` | integer or null | Logical CPUs seen by longpole at capture time. |
-| `git` | object or null | `{"sha", "branch", "dirty"}`; `branch` is null on a detached head. |
 | `ccache` | object or null | `ccache --print-stats` as key/value strings. |
 
 ## raw/index.json and raw/snippets/

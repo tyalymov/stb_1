@@ -68,6 +68,6 @@ class DumpFormatError(LongpoleError):
 class UnknownRunError(LongpoleError):
     """A run reference does not name exactly one stored run.
 
-    Raised for an id prefix that matches nothing or several runs, a ``sha:``
-    or ``label:`` with no match, or ``latest`` in an empty store.
+    Raised for an id prefix that matches nothing or several runs, a
+    ``label:`` with no match, or ``latest`` in an empty store.
     """

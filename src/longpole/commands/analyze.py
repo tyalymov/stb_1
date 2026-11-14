@@ -2,7 +2,7 @@
 
 Without a run reference the command picks the newest run in the store. A
 reference selects any other run: an id or prefix, ``latest``, ``latest~N``,
-``sha:<prefix>``, ``label:<name>`` or the path of a dump.
+``label:<name>`` or the path of a dump.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def analyze(
     in the store.
 
     Args:
-        run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
+        run: Run id or prefix, latest, latest~N, label:<name>,
             or a dump path.
         store: Run store to read.
         top: Rows per table.

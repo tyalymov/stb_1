@@ -44,7 +44,7 @@ def export(
     store.
 
     Args:
-        run: Run id or prefix, latest, latest~N, sha:<prefix>, label:<name>,
+        run: Run id or prefix, latest, latest~N, label:<name>,
             or a dump path.
         store: Run store to read.
         perfetto: Write the Perfetto trace to PATH ('-' for standard output).

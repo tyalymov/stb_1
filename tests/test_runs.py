@@ -99,7 +99,6 @@ def test_show_prints_the_manifest(tmp_path: Path, capsys: pytest.CaptureFixture[
     out = capsys.readouterr().out
     assert "20261031T120100Z-000002" in out
     assert "/work/project/build" in out
-    assert "0123456789ab main" in out
     assert main(["runs", "show", "latest~1", "--store", str(store), "--output-format", "json"]) == 0
     document = json.loads(capsys.readouterr().out)
     assert document["run_id"] == "20261031T120000Z-000001"

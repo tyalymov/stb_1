@@ -167,14 +167,14 @@ longpole analyze --output-format json  # everything above as JSON
 ```
 
 A run reference is an id or a prefix of one, `latest`, `latest~N`,
-`sha:<commit prefix>`, `label:<name>`, or the path of a run directory.
+`label:<name>`, or the path of a run directory.
 
 ## What a run holds
 
 The files CMake wrote, unchanged: the index, one snippet per launched step
 and, after a configure, the File API reply the target graph comes from.
 Next to them a manifest with what is only knowable at capture time: the
-hook, the tree, the CMake version and generator, the git state, ccache's
+hook, the tree, the CMake version and generator, ccache's
 counters and your labels. The callback copies and stops; parsing happens
 when a run is read, so a dump written by an older longpole still reads with
 a newer one. The layout is described in
@@ -187,7 +187,8 @@ never has to work out where to write and a CI job can say once where its
 runs go and how they are tagged:
 
 ```sh
-longpole enable build --store "$RUNNER_TEMP/longpole" --label "ci:$GITHUB_RUN_ID"
+longpole enable build --store "$RUNNER_TEMP/longpole" \
+  --label "sha:$GITHUB_SHA" --label "ci:$GITHUB_RUN_ID"
 ```
 
 ## Limits

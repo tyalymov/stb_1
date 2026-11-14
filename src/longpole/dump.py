@@ -23,7 +23,7 @@ import zstandard
 from longpole.cmake import fileapi, snippets
 from longpole.errors import DumpFormatError
 from longpole.jsonfields import FieldError, Fields, load_object
-from longpole.model import Environment, GitInfo, Manifest, Run
+from longpole.model import Environment, Manifest, Run
 
 MANIFEST = "manifest.json"
 RAW = "raw"
@@ -205,33 +205,13 @@ def _environment(fields: Fields) -> Environment:
     Raises:
         FieldError: A field has the wrong type.
     """
-    git = fields.optional_object("git")
     ccache = fields.optional_object("ccache")
     return Environment(
         cmake_version=fields.optional_string("cmake_version"),
         generator=fields.optional_string("generator"),
         cpu_count=fields.optional_int("cpu_count"),
-        git=_git(Fields(git)) if git is not None else None,
         ccache={key: str(value) for key, value in ccache.items()} if ccache is not None else None,
     )
-
-
-def _git(fields: Fields) -> GitInfo:
-    """Rebuild a :class:`~longpole.model.GitInfo`.
-
-    Args:
-        fields: Accessor over the ``git`` object.
-
-    Returns:
-        The git state.
-
-    Raises:
-        FieldError: A field is missing or has the wrong type.
-    """
-    dirty = fields.optional_bool("dirty")
-    if dirty is None:
-        raise FieldError("field 'dirty' must be a boolean, got null")
-    return GitInfo(sha=fields.string("sha"), branch=fields.optional_string("branch"), dirty=dirty)
 
 
 def pack(directory: Path, archive: Path) -> Path:

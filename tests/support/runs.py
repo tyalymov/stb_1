@@ -19,7 +19,6 @@ from longpole.jsonfields import Json
 from longpole.model import (
     DataVersion,
     Environment,
-    GitInfo,
     Graph,
     HostLoad,
     Manifest,
@@ -261,7 +260,6 @@ def sample_run(
     *,
     run_id: str = "20261031T120000Z-abc123",
     created_at: str = "2026-10-31T12:00:00+00:00",
-    sha: str | None = "0123456789abcdef0123456789abcdef01234567",
     labels: tuple[str, ...] = (),
     build_dir: str = "/work/project/build",
     with_graph: bool = True,
@@ -275,7 +273,6 @@ def sample_run(
     Args:
         run_id: Store id.
         created_at: Capture time.
-        sha: Commit of the sources, or ``None`` for a run outside git.
         labels: Run labels.
         build_dir: Build tree path.
         with_graph: Include a target graph.
@@ -381,7 +378,6 @@ def sample_run(
             cmake_version="4.5.0",
             generator="Ninja",
             cpu_count=12,
-            git=GitInfo(sha=sha, branch="main", dirty=False) if sha is not None else None,
             ccache={"cache_hit_direct": "12"},
         ),
         labels=labels,

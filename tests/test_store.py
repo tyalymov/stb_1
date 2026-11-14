@@ -54,7 +54,7 @@ def test_dump_layout_matches_the_documented_format(tmp_path: Path) -> None:
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["format_version"] == 2
     assert manifest["labels"] == ["ci:42"]
-    assert manifest["environment"]["git"]["branch"] == "main"
+    assert manifest["environment"]["generator"] == "Ninja"
     assert sorted(path.name for path in directory.iterdir()) == ["manifest.json", "raw"]
     assert (directory / "raw" / "index.json").is_file()
     assert len(list((directory / "raw" / "snippets").iterdir())) == len(run.steps)
@@ -63,7 +63,7 @@ def test_dump_layout_matches_the_documented_format(tmp_path: Path) -> None:
 
 def test_a_run_without_a_reply_has_no_graph_unless_lent_one(tmp_path: Path) -> None:
     """Without raw/fileapi the run reads back graphless; a reply directory passed in fills it."""
-    run = sample_run(with_graph=False, with_system=False, sha=None)
+    run = sample_run(with_graph=False, with_system=False)
     directory = _dump(run, tmp_path)
     assert not (directory / "raw" / "fileapi").exists()
     assert dump.read_run(directory) == run
@@ -123,20 +123,17 @@ def _three_runs(store: RunStore) -> list[Run]:
         sample_run(
             run_id="20261031T120000Z-000001",
             created_at="2026-10-31T12:00:00+00:00",
-            sha="aaaa" + "0" * 36,
             labels=("first",),
         ),
         sample_run(
             run_id="20261031T120100Z-000002",
             created_at="2026-10-31T12:01:00+00:00",
-            sha="bbbb" + "0" * 36,
             labels=("ci:7",),
             build_dir="/elsewhere/build",
         ),
         sample_run(
             run_id="20261031T120200Z-000003",
             created_at="2026-10-31T12:02:00+00:00",
-            sha="bbbb" + "1" * 36,
             labels=(),
         ),
     ]
@@ -160,16 +157,13 @@ def test_store_lists_oldest_first_and_points_latest_at_the_newest(tmp_path: Path
 
 
 def test_references_resolve_to_the_right_run(tmp_path: Path) -> None:
-    """latest, latest~N, id prefixes, sha: and label: all find their run; a path is itself."""
+    """latest, latest~N, id prefixes and label: all find their run; a path is itself."""
     store = RunStore(tmp_path / "store")
     first, second, third = _three_runs(store)
     assert store.read("latest") == third
     assert store.read("latest~1") == second
     assert store.read("latest~2") == first
     assert store.read("20261031T120000Z") == first
-    assert store.read("sha:aaaa") == first
-    assert store.read("sha:bbbb1") == third
-    assert store.read("sha:bbbb") == third  # newest match wins
     assert store.read("label:ci:7") == second
     assert store.read(str(store.runs_dir / second.manifest.run_id)) == second
 
@@ -186,8 +180,6 @@ def test_unresolvable_references_say_why(tmp_path: Path) -> None:
         store.resolve("20261031T12")
     with pytest.raises(UnknownRunError, match="labelled"):
         store.resolve("label:nope")
-    with pytest.raises(UnknownRunError, match="commit"):
-        store.resolve("sha:ffff")
 
 
 def test_empty_store_has_no_latest(tmp_path: Path) -> None:
