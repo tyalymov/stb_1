@@ -40,15 +40,7 @@ def test_long_common_source_prefix_moves_into_the_title() -> None:
 
 
 def _store_with(tmp_path: Path, *runs: Run) -> Path:
-    """Write runs into a fresh store under ``tmp_path``.
-
-    Args:
-        tmp_path: The test's temporary directory.
-        *runs: Runs to store, in order.
-
-    Returns:
-        The store directory.
-    """
+    """Write runs into a fresh store under ``tmp_path``."""
     store = RunStore(tmp_path / "store")
     for run in runs:
         write_run(store, run)

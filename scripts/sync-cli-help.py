@@ -21,12 +21,7 @@ CLI_MODULE = Path(__file__).resolve().parents[1] / "src" / "longpole" / "cli.py"
 
 
 def main() -> int:
-    """Replace the docstring at the top of the module with the current help text.
-
-    Returns:
-        0 when the file was rewritten or already current; 1 when the module
-        does not start with a docstring.
-    """
+    """Replace the docstring at the top of the module with the current help text."""
     text = CLI_MODULE.read_text(encoding="utf-8")
     if not text.startswith('"""'):
         sys.stderr.write(f"{CLI_MODULE}: expected a module docstring first\n")
@@ -39,11 +34,7 @@ def main() -> int:
 
 
 def help_text() -> str:
-    """Render ``longpole --help`` at the app's width, without the trailing spaces rich pads with.
-
-    Returns:
-        The help text.
-    """
+    """Render ``longpole --help`` at the app's width, without the trailing spaces rich pads with."""
     buffer = io.StringIO()
     cli.app.meta(["--help"], console=Console(file=buffer, width=cli.app.console.width))
     return "".join(line.rstrip() + "\n" for line in buffer.getvalue().splitlines())

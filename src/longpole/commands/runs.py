@@ -32,12 +32,6 @@ _UNIT_SECONDS = {"m": 60, "h": 3600, "d": 86400}
 def duration(text: str) -> timedelta:
     """Parse an age such as ``90m``, ``12h`` or ``7d``.
 
-    Args:
-        text: The argument as typed.
-
-    Returns:
-        The duration.
-
     Raises:
         ValueError: The text is not a number followed by m, h or d.
     """
@@ -49,13 +43,6 @@ def duration(text: str) -> timedelta:
 
 def _age(_type: type, tokens: list[Token]) -> timedelta:
     """Adapt :func:`duration` to the converter signature cyclopts calls.
-
-    Args:
-        _type: The annotated type; unused.
-        tokens: The command-line tokens for the option; exactly one.
-
-    Returns:
-        The duration.
 
     Raises:
         ValueError: The token is not an age.
@@ -88,9 +75,6 @@ def list_runs(
         since: Only runs captured within AGE, e.g. 90m, 12h or 7d.
         label: Only runs carrying this label.
         output_format: text, or json for a program.
-
-    Returns:
-        0.
     """
     return _list(RunStore(store), since=since, label=label, output_format=output_format)
 
@@ -106,9 +90,6 @@ def show(
             or a dump path.
         store: Run store to read.
         output_format: text, or json for a program.
-
-    Returns:
-        0.
 
     Raises:
         UnknownRunError: The reference names no run.
@@ -133,9 +114,6 @@ def prune(
         older_than: Delete runs older than AGE, e.g. 90d.
         output_format: text, or json for a program.
 
-    Returns:
-        0.
-
     Raises:
         UsageError: Neither limit was given.
     """
@@ -151,17 +129,7 @@ def _list(
     label: str | None,
     output_format: OutputFormat,
 ) -> int:
-    """Print the catalogue.
-
-    Args:
-        store: The store.
-        since: Only runs captured within this long ago, or ``None``.
-        label: Only runs carrying this label, or ``None``.
-        output_format: Aligned lines, or JSON.
-
-    Returns:
-        0.
-    """
+    """Print the catalogue."""
     cutoff = datetime.now(UTC) - since if since is not None else None
     summaries = store.list(label=label, since=cutoff)
 
@@ -184,13 +152,6 @@ def _catalogue(summaries: list[RunSummary], one_tree: bool) -> str:
     indented line of its own where it can be as long as it needs to be.
     Durations are not listed: the summary knows only what the callback knew,
     and it did not parse the snippets.
-
-    Args:
-        summaries: Runs, oldest first.
-        one_tree: Whether every row is from the same tree, so its line can go.
-
-    Returns:
-        The text, one or two lines per run.
     """
     hook_width = max(len(summary.hook) for summary in summaries)
     lines: list[str] = []
@@ -210,14 +171,7 @@ def _catalogue(summaries: list[RunSummary], one_tree: bool) -> str:
 
 
 def _when(created_at: str) -> str:
-    """Shorten an ISO timestamp to minute precision in UTC.
-
-    Args:
-        created_at: ISO 8601 timestamp.
-
-    Returns:
-        ``YYYY-MM-DD HH:MM``, or the input unchanged if it does not parse.
-    """
+    """Shorten an ISO timestamp to minute precision in UTC."""
     try:
         moment = datetime.fromisoformat(created_at)
     except ValueError:
@@ -227,14 +181,6 @@ def _when(created_at: str) -> str:
 
 def _show(store: RunStore, ref: str, *, output_format: OutputFormat) -> int:
     """Print one run's manifest.
-
-    Args:
-        store: The store.
-        ref: Run reference.
-        output_format: A key/value table, or JSON.
-
-    Returns:
-        0.
 
     Raises:
         UnknownRunError: The reference names no run.
@@ -246,14 +192,7 @@ def _show(store: RunStore, ref: str, *, output_format: OutputFormat) -> int:
 
 
 def _manifest_document(loaded: Run) -> dict[str, object]:
-    """The manifest plus two counts, for JSON.
-
-    Args:
-        loaded: The run.
-
-    Returns:
-        A JSON-ready object.
-    """
+    """The manifest plus two counts, for JSON."""
     document: dict[str, object] = asdict(loaded.manifest)
     document["data_version"] = asdict(loaded.data_version)
     document["steps"] = len(loaded.steps)
@@ -262,14 +201,7 @@ def _manifest_document(loaded: Run) -> dict[str, object]:
 
 
 def _manifest_table(loaded: Run) -> str:
-    """The manifest as a key/value table.
-
-    Args:
-        loaded: The run.
-
-    Returns:
-        The text.
-    """
+    """The manifest as a key/value table."""
     manifest = loaded.manifest
     environment = manifest.environment
     rows = [
@@ -292,17 +224,7 @@ def _manifest_table(loaded: Run) -> str:
 def _prune(
     store: RunStore, *, keep: int | None, older_than: timedelta | None, output_format: OutputFormat
 ) -> int:
-    """Delete runs and say which.
-
-    Args:
-        store: The store.
-        keep: How many newest runs survive, or ``None``.
-        older_than: Runs older than this go, or ``None``.
-        output_format: One id per line, or a JSON list.
-
-    Returns:
-        0.
-    """
+    """Delete runs and say which."""
     deleted = store.prune(keep=keep, older_than=older_than)
     output.result(deleted, output_format, text="\n".join)
     log.info("deleted %d run(s) from %s", len(deleted), store.root)

@@ -29,14 +29,7 @@ Kind = Literal["query", "index", "snippet"]
 
 @cache
 def _validator(kind: Kind) -> Draft202012Validator:
-    """Load one vendored schema and build a validator for it, once per process.
-
-    Args:
-        kind: Which schema to load.
-
-    Returns:
-        A validator for the 2020-12 draft the schemas declare.
-    """
+    """Load one vendored schema and build a validator for it, once per process."""
     text = resources.files("longpole.cmake.schemas").joinpath(f"{kind}-v1-schema.json")
     schema = json.loads(text.read_text(encoding="utf-8"))
     return Draft202012Validator(schema)
@@ -46,12 +39,6 @@ def validate(kind: Kind, document: Json, *, source: str = "<memory>") -> None:
     """Check one document against the schema of its kind.
 
     Succeeds silently when the document conforms. Nothing is modified.
-
-    Args:
-        kind: ``query``, ``index`` or ``snippet``.
-        document: The parsed JSON object to check.
-        source: Where the document came from, for the error message; usually
-            a file path.
 
     Raises:
         SchemaError: The document violates the schema. The message carries
@@ -77,13 +64,6 @@ def _most_specific(errors: list[ValidationError], document: Json) -> ValidationE
     with the whole document in the message. The useful error is one level
     down, in the branch that matches the document's own ``version.minor``;
     when that minor is itself broken, any branch tells the same story.
-
-    Args:
-        errors: Every violation the validator produced; non-empty.
-        document: The document, to read its declared minor version.
-
-    Returns:
-        The violation to report.
     """
     worst: ValidationError = best_match(errors)
     if worst.validator != "oneOf" or not worst.context:
@@ -98,14 +78,7 @@ def _most_specific(errors: list[ValidationError], document: Json) -> ValidationE
 
 
 def _declared_minor(document: Json) -> int | None:
-    """Read ``version.minor`` from a document, if it is there and is an integer.
-
-    Args:
-        document: Parsed index or snippet.
-
-    Returns:
-        The minor version, or ``None`` when absent or malformed.
-    """
+    """Read ``version.minor`` from a document, if it is there and is an integer."""
     version = document.get("version")
     if not isinstance(version, dict):
         return None

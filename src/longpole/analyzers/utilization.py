@@ -53,13 +53,6 @@ def utilization(run: Run) -> Utilization:
     """Measure the parallelism of a run.
 
     Pure: reads the run, touches nothing else.
-
-    Args:
-        run: A stored run; one without leaf steps yields zeros and a
-            recommendation saying so.
-
-    Returns:
-        The measurements.
     """
     leaf_steps = [step for step in run.steps if step.role not in WRAPPER_ROLES]
     cpu_count = run.manifest.environment.cpu_count
@@ -79,16 +72,7 @@ def utilization(run: Run) -> Utilization:
 
 
 def _sweep(steps: list[Step]) -> tuple[int, int, int, int, float]:
-    """Walk the timeline of step starts and ends.
-
-    Args:
-        steps: Leaf steps in any order.
-
-    Returns:
-        Peak concurrency, active milliseconds, idle milliseconds, tail
-        milliseconds and the time-weighted sum of concurrency (the numerator
-        of the average).
-    """
+    """Walk the timeline of step starts and ends."""
     events: list[tuple[int, int]] = []
     for step in steps:
         events.append((step.time_start_ms, 1))
@@ -117,18 +101,7 @@ def _sweep(steps: list[Step]) -> tuple[int, int, int, int, float]:
 
 
 def _recommend(cpu_count: int | None, peak: int, average: float, tail_share: float) -> str:
-    """Put the numbers into sentences.
-
-    Args:
-        cpu_count: Cores of the machine, if known.
-        peak: Peak concurrency.
-        average: Average concurrency while active.
-        tail_share: Fraction of active time on a single step.
-
-    Returns:
-        The text. It states what was measured and what it rules out; it does
-        not guess a job count.
-    """
+    """Put the numbers into sentences."""
     if peak == 0:
         return "No leaf steps ran, so there is nothing to measure."
     tail = f"{tail_share:.0%} of the active time ran a single step."

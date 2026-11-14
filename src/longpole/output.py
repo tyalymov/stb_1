@@ -36,15 +36,7 @@ def result(
     text: Callable[[T], str],
     data: Callable[[T], object] | None = None,
 ) -> None:
-    """Print a command's result in the format the user asked for.
-
-    Args:
-        value: The result.
-        output_format: ``text`` or ``json``.
-        text: Renders the result for a person; an empty string prints nothing.
-        data: Turns the result into a JSON-ready object when the value itself
-            is not one. Dataclasses and paths are handled without it.
-    """
+    """Print a command's result in the format the user asked for."""
     if output_format == "json":
         document = value if data is None else data(value)
         stdout(json.dumps(document, indent=2, default=_encode))
@@ -57,12 +49,6 @@ def result(
 def _encode(value: object) -> object:
     """Tell ``json.dumps`` how to write the types our results contain.
 
-    Args:
-        value: Something ``json`` does not know.
-
-    Returns:
-        A dataclass as a dict, a path as a string.
-
     Raises:
         TypeError: Anything else; the result is not meant for JSON.
     """
@@ -74,18 +60,10 @@ def _encode(value: object) -> object:
 
 
 def stdout(text: str) -> None:
-    """Write a result to standard output, ending it with a newline if it lacks one.
-
-    Args:
-        text: The text; an empty string writes a bare newline.
-    """
+    """Write a result to standard output, ending it with a newline if it lacks one."""
     sys.stdout.write(text if text.endswith("\n") else text + "\n")
 
 
 def stderr(text: str) -> None:
-    """Write a message for a person to standard error, ending it with a newline if it lacks one.
-
-    Args:
-        text: The text; an empty string writes a bare newline.
-    """
+    """Write a message for a person to standard error, ending it with a newline if it lacks one."""
     sys.stderr.write(text if text.endswith("\n") else text + "\n")

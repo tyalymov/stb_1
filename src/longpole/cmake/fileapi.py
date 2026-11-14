@@ -51,14 +51,7 @@ class Reply:
 
 
 def query_path(build_dir: Path) -> Path:
-    """Where our query file lives in a build tree.
-
-    Args:
-        build_dir: The build tree.
-
-    Returns:
-        ``<build>/.cmake/api/v1/query/client-longpole/query.json``.
-    """
+    """Where our query file lives in a build tree."""
     return build_dir / ".cmake" / "api" / "v1" / "query" / CLIENT / "query.json"
 
 
@@ -68,12 +61,6 @@ def write_query(build_dir: Path) -> Path:
     Creates the query directory if needed and writes the same content every
     time, so calling it twice is harmless. The build tree need not exist yet:
     a query placed before the first configure is answered by that configure.
-
-    Args:
-        build_dir: The build tree, existing or not.
-
-    Returns:
-        Path of the written query file.
     """
     path = query_path(build_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -82,14 +69,7 @@ def write_query(build_dir: Path) -> Path:
 
 
 def reply_dir(build_dir: Path) -> Path:
-    """Where CMake answers File API queries in a build tree.
-
-    Args:
-        build_dir: The build tree.
-
-    Returns:
-        ``<build>/.cmake/api/v1/reply``, existing or not.
-    """
+    """Where CMake answers File API queries in a build tree."""
     return build_dir / ".cmake" / "api" / "v1" / "reply"
 
 
@@ -98,14 +78,6 @@ def read_reply(reply_dir: Path) -> Reply | None:
 
     The directory is either the tree's own (:func:`reply_dir`) or a copy of
     it, as a run dump keeps.
-
-    Args:
-        reply_dir: The reply directory.
-
-    Returns:
-        The reply, or ``None`` when the directory does not exist, holds no
-        index file, or no answer for our client (the tree was generated
-        before the query was written).
 
     Raises:
         FileApiError: A reply file exists but is not the JSON the File API
@@ -141,13 +113,6 @@ def graph_from_reply(reply: Reply, *, configuration: str | None = None) -> Graph
     Edges follow the codemodel's ``dependencies``, which list what the
     generator makes a target wait for, transitive link dependencies included.
 
-    Args:
-        reply: A reply with a codemodel.
-        configuration: Configuration name to read, e.g. ``Release``.
-
-    Returns:
-        Targets and dependency edges of that configuration.
-
     Raises:
         FileApiError: The codemodel or a target file lacks a promised field,
             or the named configuration does not exist.
@@ -178,12 +143,6 @@ def graph_from_reply(reply: Reply, *, configuration: str | None = None) -> Graph
 def toolchains_from_reply(reply: Reply) -> tuple[Toolchain, ...]:
     """Read which compiler CMake chose for each language.
 
-    Args:
-        reply: A reply; one without a toolchains answer yields no toolchains.
-
-    Returns:
-        One entry per enabled language, in the reply's order.
-
     Raises:
         FileApiError: The toolchains object lacks a promised field.
     """
@@ -209,13 +168,6 @@ def toolchains_from_reply(reply: Reply) -> tuple[Toolchain, ...]:
 
 def _configuration(configurations: tuple[Fields, ...], name: str | None) -> Fields:
     """Pick the configuration to read.
-
-    Args:
-        configurations: The codemodel's ``configurations`` array.
-        name: Wanted configuration name, or ``None`` for the first one.
-
-    Returns:
-        The configuration object.
 
     Raises:
         FieldError: There are no configurations, or none has the wanted name.

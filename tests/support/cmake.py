@@ -24,12 +24,6 @@ def instrumentation_options(version: tuple[int, int, int]) -> tuple[str, ...]:
 
     ``processMetrics`` exists from 4.5 on; asking an older CMake for it would
     make it ignore the whole query, so the set depends on the version.
-
-    Args:
-        version: ``(major, minor, patch)`` of the CMake that will read the query.
-
-    Returns:
-        Option names to put in the query.
     """
     options = ["staticSystemInformation", "dynamicSystemInformation"]
     if version[:2] >= (4, 5):
@@ -57,12 +51,7 @@ class InstrumentationQuery:
     minor: int = 0
 
     def to_json(self) -> Json:
-        """Render the query in the layout CMake reads.
-
-        Returns:
-            A JSON object with ``version`` and whichever of ``hooks``,
-            ``callbacks`` and ``options`` are non-empty.
-        """
+        """Render the query in the layout CMake reads."""
         query: Json = {"version": {"major": 1, "minor": self.minor}}
         if self.hooks:
             query["hooks"] = list(self.hooks)
@@ -95,12 +84,7 @@ class CapturedIndex:
         return str(self.index["hook"])
 
     def roles(self) -> dict[str, int]:
-        """Count snippets per role.
-
-        Returns:
-            Mapping from role name (``compile``, ``link``, ...) to how many
-            snippets carry it.
-        """
+        """Count snippets per role."""
         counts: dict[str, int] = {}
         for snippet in self.snippets:
             role = str(snippet["role"])
@@ -108,14 +92,7 @@ class CapturedIndex:
         return counts
 
     def with_role(self, role: str) -> list[Json]:
-        """Select snippets of one role.
-
-        Args:
-            role: Role name as CMake writes it.
-
-        Returns:
-            Matching snippets in index order; empty if none.
-        """
+        """Select snippets of one role."""
         return [snippet for snippet in self.snippets if snippet["role"] == role]
 
 
@@ -163,23 +140,11 @@ class CMakeProject:
         return self.instrumentation_dir / "data"
 
     def set_env(self, **variables: str) -> None:
-        """Add environment variables to every subsequent CMake invocation.
-
-        Args:
-            **variables: Names and values, e.g. ``CTEST_USE_INSTRUMENTATION="1"``.
-        """
+        """Add environment variables to every subsequent CMake invocation."""
         self._env.update(variables)
 
     def write_query(self, query: InstrumentationQuery, name: str = "test") -> Path:
-        """Write a query file into the build tree, creating the directory if needed.
-
-        Args:
-            query: What to collect and whom to call.
-            name: File stem; several queries may coexist and CMake merges them.
-
-        Returns:
-            Path of the written ``<name>.json``.
-        """
+        """Write a query file into the build tree, creating the directory if needed."""
         query_dir = self.instrumentation_dir / "query"
         query_dir.mkdir(parents=True, exist_ok=True)
         path = query_dir / f"{name}.json"
@@ -187,24 +152,13 @@ class CMakeProject:
         return path
 
     def snippet_files(self) -> list[Path]:
-        """List snippet files currently sitting in the data directory.
-
-        Returns:
-            Sorted paths of ``*.json`` files directly under ``data/``; empty
-            when CMake has indexed and deleted them, or never wrote any.
-        """
+        """List snippet files currently sitting in the data directory."""
         if not self.data_dir.is_dir():
             return []
         return sorted(p for p in self.data_dir.iterdir() if p.suffix == ".json")
 
     def configure(self, *extra_args: str) -> subprocess.CompletedProcess[str]:
         """Run ``cmake -S <source> -B <build> -G <generator>``.
-
-        Args:
-            *extra_args: Additional arguments, e.g. ``-DCMAKE_BUILD_TYPE=Debug``.
-
-        Returns:
-            The completed process with captured stdout and stderr.
 
         Raises:
             subprocess.CalledProcessError: Configure or generate failed.
@@ -223,12 +177,6 @@ class CMakeProject:
     def build(self, *extra_args: str) -> subprocess.CompletedProcess[str]:
         """Run ``cmake --build <build>``.
 
-        Args:
-            *extra_args: Additional arguments, e.g. ``--target a``.
-
-        Returns:
-            The completed process.
-
         Raises:
             subprocess.CalledProcessError: The build failed.
         """
@@ -239,23 +187,11 @@ class CMakeProject:
 
         A fixture may contain a test that is meant to fail; ctest's non-zero
         exit in that case is data, not an error.
-
-        Args:
-            *extra_args: Additional ctest arguments.
-
-        Returns:
-            The completed process; check ``returncode`` yourself.
         """
         return self._run(self.ctest, "--test-dir", str(self.build_dir), *extra_args, check=False)
 
     def install(self, prefix: Path) -> subprocess.CompletedProcess[str]:
         """Run ``cmake --install <build> --prefix <prefix>``.
-
-        Args:
-            prefix: Installation prefix; created by CMake.
-
-        Returns:
-            The completed process.
 
         Raises:
             subprocess.CalledProcessError: Installation failed.
@@ -265,23 +201,13 @@ class CMakeProject:
     def workflow(self, preset: str) -> subprocess.CompletedProcess[str]:
         """Run ``cmake --workflow --preset <preset>`` from the source directory.
 
-        Args:
-            preset: Workflow preset name from the fixture's ``CMakePresets.json``.
-
-        Returns:
-            The completed process.
-
         Raises:
             subprocess.CalledProcessError: Any workflow step failed.
         """
         return self._run(self.cmake, "--workflow", "--preset", preset, cwd=self.source_dir)
 
     def captured(self) -> list[CapturedIndex]:
-        """Load everything the callback stub saved so far.
-
-        Returns:
-            Captures in the order the callback ran; empty if it never did.
-        """
+        """Load everything the callback stub saved so far."""
         if not self.capture_root.is_dir():
             return []
         captures: list[CapturedIndex] = []
@@ -301,14 +227,6 @@ class CMakeProject:
         self, *command: str | Path, check: bool = True, cwd: Path | None = None
     ) -> subprocess.CompletedProcess[str]:
         """Run one subprocess with the project's environment, capturing text output.
-
-        Args:
-            *command: Executable and arguments.
-            check: Raise on non-zero exit when true.
-            cwd: Working directory; defaults to the build directory's parent.
-
-        Returns:
-            The completed process.
 
         Raises:
             subprocess.CalledProcessError: Non-zero exit and ``check`` is true.

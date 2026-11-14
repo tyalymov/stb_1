@@ -28,16 +28,7 @@ _ROW_BUDGETS: tuple[int | None, ...] = (None, 10, 5, 3, 1, 0)
 
 
 def format_markdown(report: Report, *, limit_bytes: int = DEFAULT_LIMIT) -> str:
-    """Render the snapshot of one run.
-
-    Args:
-        report: The report.
-        limit_bytes: Size the UTF-8 text must stay under; tables lose rows
-            until it does.
-
-    Returns:
-        The Markdown text, ending with a newline.
-    """
+    """Render the snapshot of one run."""
     for rows in _ROW_BUDGETS[:-1]:
         text = _render(report, rows=rows, truncated=rows is not None)
         if len(text.encode("utf-8")) <= limit_bytes:
@@ -46,17 +37,7 @@ def format_markdown(report: Report, *, limit_bytes: int = DEFAULT_LIMIT) -> str:
 
 
 def _render(report: Report, *, rows: int | None, truncated: bool) -> str:
-    """Render with a given number of rows per table.
-
-    Args:
-        report: The report.
-        rows: Rows each ranked table keeps; ``None`` keeps them all, 0 drops
-            the tables.
-        truncated: Whether to say that tables were shortened.
-
-    Returns:
-        The text.
-    """
+    """Render with a given number of rows per table."""
     summary = report.summary
     totals = summary.totals
     parts: list[str] = [
@@ -103,14 +84,7 @@ def _render(report: Report, *, rows: int | None, truncated: bool) -> str:
 
 
 def _headline(report: Report) -> str:
-    """The one line that says whether to read on.
-
-    Args:
-        report: The report.
-
-    Returns:
-        Span, busy time, step count, critical path and peak parallelism.
-    """
+    """The one line that says whether to read on."""
     totals = report.summary.totals
     pieces = [
         f"**{units.duration(totals.span_ms)}** wall clock",
@@ -130,15 +104,7 @@ def _headline(report: Report) -> str:
 
 
 def _critical_path_section(path: CriticalPath | Unavailable, rows: int | None) -> list[str]:
-    """The critical path as a Gantt chart plus its table, or the reason there is none.
-
-    Args:
-        path: The analyzer's result.
-        rows: Rows the unattributed list keeps; ``None`` all, 0 drops it.
-
-    Returns:
-        Lines of Markdown.
-    """
+    """The critical path as a Gantt chart plus its table, or the reason there is none."""
     lines = ["### Critical path", ""]
     if isinstance(path, Unavailable):
         lines.extend([path.reason[:1].upper() + path.reason[1:] + ".", ""])
@@ -180,12 +146,6 @@ def _gantt(path: CriticalPath) -> list[str]:
     Mermaid reads ``dateFormat x`` as milliseconds since the epoch; the bars
     sit at the segments' model times, which start at zero, and the axis
     shows minutes and seconds.
-
-    Args:
-        path: The critical path.
-
-    Returns:
-        The fenced code block.
     """
     lines = ["```mermaid", "gantt", "    dateFormat x", "    axisFormat %M:%S", "    section chain"]
     for index, segment in enumerate(path.chain):
@@ -197,14 +157,7 @@ def _gantt(path: CriticalPath) -> list[str]:
 
 
 def _parallelism_section(report: Report) -> list[str]:
-    """Three sentences on parallelism.
-
-    Args:
-        report: The report.
-
-    Returns:
-        Lines of Markdown.
-    """
+    """Three sentences on parallelism."""
     u = report.utilization
     cores = f" of {u.cpu_count} cores" if u.cpu_count is not None else ""
     return [
@@ -218,15 +171,7 @@ def _parallelism_section(report: Report) -> list[str]:
 
 
 def _sizes_section(report: Report, rows: int | None) -> list[str]:
-    """Artifact sizes by kind, with the largest files folded away.
-
-    Args:
-        report: The report.
-        rows: Rows the largest-artifacts table keeps; ``None`` all, 0 drops it.
-
-    Returns:
-        Lines of Markdown.
-    """
+    """Artifact sizes by kind, with the largest files folded away."""
     sizes = report.sizes
     lines = ["### Artifacts", ""]
     if not sizes.by_kind:
@@ -263,15 +208,7 @@ def _sizes_section(report: Report, rows: int | None) -> list[str]:
 
 
 def _entries_details(title: str, entries: Sequence[Entry]) -> list[str]:
-    """A ranked table inside a collapsible block.
-
-    Args:
-        title: The block's summary line.
-        entries: Rows, already ranked and cut.
-
-    Returns:
-        Lines of Markdown.
-    """
+    """A ranked table inside a collapsible block."""
     lines = [f"<details><summary>{title}</summary>", ""]
     lines.extend(
         _table(
@@ -287,13 +224,6 @@ def _table(columns: Sequence[str], rows: Iterable[Sequence[str]]) -> list[str]:
     """A GitHub-flavoured Markdown table.
 
     Pipes inside cells are escaped so a path with one cannot break the row.
-
-    Args:
-        columns: Header cells.
-        rows: Body rows, one cell per column.
-
-    Returns:
-        The table's lines.
     """
     lines = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
     for row in rows:

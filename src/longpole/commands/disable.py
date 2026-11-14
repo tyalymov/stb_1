@@ -29,9 +29,6 @@ def disable(build_dir: Path, /, *, output_format: Output = "text") -> int:
         build_dir: Build tree to stop instrumenting.
         output_format: text, or json for a program.
 
-    Returns:
-        0 on success; failures raise.
-
     Raises:
         OSError: A file exists but cannot be deleted.
     """

@@ -54,9 +54,6 @@ def capture(
         store: Run store to write the run to.
         label: Label the run; may be repeated.
 
-    Returns:
-        0; a skipped empty index is a success too.
-
     Raises:
         FileNotFoundError: The index or a snippet is already gone.
         IndexFormatError: The index does not say which files to copy.

@@ -37,15 +37,7 @@ def test_no_reply_directory_means_no_reply(tmp_path: Path) -> None:
 
 
 def _write_reply(build_dir: Path, *, with_client: bool = True) -> Path:
-    """Write a hand-made File API reply with two targets, ``app`` depending on ``lib``.
-
-    Args:
-        build_dir: Build tree to put ``.cmake/api/v1/reply`` under.
-        with_client: Whether the index answers our client at all.
-
-    Returns:
-        The reply directory.
-    """
+    """Write a hand-made File API reply with two targets, ``app`` depending on ``lib``."""
     reply = build_dir / ".cmake" / "api" / "v1" / "reply"
     reply.mkdir(parents=True)
     lib: Json = {

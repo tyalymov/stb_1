@@ -79,13 +79,6 @@ def describe(cmake: Path, *, timeout: float = 30.0) -> CMakeInfo:
     from the release line: 4.3 writes 1.0, 4.4 writes 1.1. Anything before
     4.3 has no instrumentation API.
 
-    Args:
-        cmake: The executable to query.
-        timeout: Seconds to wait for it.
-
-    Returns:
-        Version and data-version facts about that binary.
-
     Raises:
         CMakeToolError: The binary cannot run, exits non-zero, times out or
             prints something other than the capabilities JSON.
@@ -121,12 +114,6 @@ def read_cache(build_dir: Path) -> CacheInfo:
     without a cache yields a :class:`CacheInfo` of ``None`` values rather
     than an error, because a callback may legitimately run before anything
     was configured.
-
-    Args:
-        build_dir: The build tree.
-
-    Returns:
-        The entries found; any of them ``None`` when absent.
     """
     cache = build_dir / "CMakeCache.txt"
     if not cache.is_file():
@@ -145,15 +132,7 @@ def read_cache(build_dir: Path) -> CacheInfo:
 
 
 def data_version_for_line(version_tuple: tuple[int, int, int]) -> DataVersion | None:
-    """Instrumentation data version a CMake release line writes, by convention.
-
-    Args:
-        version_tuple: ``(major, minor, patch)`` of the CMake.
-
-    Returns:
-        1.0 for 4.3, 1.1 for 4.4, 1.2 for 4.5 and anything newer; ``None``
-        before 4.3.
-    """
+    """Instrumentation data version a CMake release line writes, by convention."""
     line = version_tuple[:2]
     if line < MINIMUM_VERSION:
         return None
@@ -161,15 +140,7 @@ def data_version_for_line(version_tuple: tuple[int, int, int]) -> DataVersion | 
 
 
 def _data_version(reported: object, version_tuple: tuple[int, int, int]) -> DataVersion | None:
-    """Prefer the data version CMake reports; fall back to the release line.
-
-    Args:
-        reported: The ``instrumentation`` object from the capabilities, if any.
-        version_tuple: The CMake version, for the fallback.
-
-    Returns:
-        The data version, or ``None`` when the CMake has no instrumentation API.
-    """
+    """Prefer the data version CMake reports; fall back to the release line."""
     data_version = _as_json(_as_json(reported).get("dataVersion"))
     major, minor = data_version.get("major"), data_version.get("minor")
     if isinstance(major, int) and isinstance(minor, int):
@@ -178,14 +149,7 @@ def _data_version(reported: object, version_tuple: tuple[int, int, int]) -> Data
 
 
 def _internal_entries(cache_text: str) -> dict[str, str]:
-    """Collect ``NAME:INTERNAL=value`` lines of a cache file.
-
-    Args:
-        cache_text: Contents of ``CMakeCache.txt``.
-
-    Returns:
-        Mapping from entry name to its value.
-    """
+    """Collect ``NAME:INTERNAL=value`` lines of a cache file."""
     pattern = re.compile(r"^([A-Za-z0-9_-]+):INTERNAL=(.*)$")
     entries: dict[str, str] = {}
     for line in cache_text.splitlines():
@@ -197,14 +161,6 @@ def _internal_entries(cache_text: str) -> dict[str, str]:
 
 def _run(cmake: Path, *arguments: str, timeout: float) -> str:
     """Run the executable and return its standard output.
-
-    Args:
-        cmake: The executable.
-        *arguments: Command-line arguments.
-        timeout: Seconds to wait.
-
-    Returns:
-        Captured standard output as text.
 
     Raises:
         CMakeToolError: The process cannot start, exits non-zero or times out.
@@ -225,14 +181,7 @@ def _run(cmake: Path, *arguments: str, timeout: float) -> str:
 
 
 def _as_json(value: object) -> dict[str, object]:
-    """Treat a parsed JSON value as an object, or as empty when it is not one.
-
-    Args:
-        value: Any parsed JSON value.
-
-    Returns:
-        The object itself, or an empty mapping for anything else.
-    """
+    """Treat a parsed JSON value as an object, or as empty when it is not one."""
     if isinstance(value, dict):
         # JSON object keys are always strings; the cast only tells the type checker so.
         return cast(dict[str, object], value)

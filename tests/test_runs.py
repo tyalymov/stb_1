@@ -15,14 +15,7 @@ from tests.support.runs import sample_run, write_run
 
 
 def _store(tmp_path: Path) -> Path:
-    """A store with two runs from two trees, the newer one labelled.
-
-    Args:
-        tmp_path: The test's temporary directory.
-
-    Returns:
-        The store directory.
-    """
+    """A store with two runs from two trees, the newer one labelled."""
     store = RunStore(tmp_path / "store")
     write_run(
         store,

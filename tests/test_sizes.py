@@ -12,17 +12,7 @@ from tests.support.runs import sample_run
 
 
 def _link(outputs: tuple[str, ...], sizes: tuple[int, ...], *, tool: str, target: str) -> Step:
-    """A link step writing the given outputs.
-
-    Args:
-        outputs: Output paths.
-        sizes: Their sizes.
-        tool: Command line, e.g. ``ar`` or ``ranlib``.
-        target: Target name.
-
-    Returns:
-        The step.
-    """
+    """A link step writing the given outputs."""
     return Step(
         role="link",
         command=tool,

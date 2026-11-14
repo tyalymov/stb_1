@@ -30,14 +30,7 @@ WIDTH = 100
 
 
 def render(*renderables: RenderableType) -> str:
-    """Render ``rich`` objects to plain text.
-
-    Args:
-        *renderables: Tables or other renderables, printed one after another.
-
-    Returns:
-        The text, without colour codes, ending with a newline.
-    """
+    """Render ``rich`` objects to plain text."""
     buffer = io.StringIO()
     console = Console(file=buffer, width=WIDTH, force_terminal=False, color_system=None)
     for renderable in renderables:
@@ -58,17 +51,6 @@ def table(
     The caption is a line of its own above the table rather than rich's
     table title, which wraps to the table's width and breaks long paths
     across lines.
-
-    Args:
-        title: Caption above the table, or ``None``.
-        columns: Header cells.
-        rows: Body rows; each must have one cell per column.
-        right_aligned: Indexes of columns holding numbers, which read better
-            right-aligned.
-        show_header: Whether to print the header row.
-
-    Returns:
-        The table, ready for :func:`render`.
     """
     aligned = set(right_aligned)
     built = Table(show_edge=False, pad_edge=False, show_header=show_header)
@@ -82,14 +64,7 @@ def table(
 
 
 def format_summary(summary: Summary) -> str:
-    """Render a run summary: header, totals, phases and the slowest-items tables.
-
-    Args:
-        summary: The summary.
-
-    Returns:
-        The text.
-    """
+    """Render a run summary: header, totals, phases and the slowest-items tables."""
     totals = summary.totals
     header = (
         f"run {summary.run_id}  {summary.hook}  {summary.created_at}\n"
@@ -140,15 +115,7 @@ def format_summary(summary: Summary) -> str:
 
 
 def _entries_table(title: str, entries: Sequence[Entry]) -> RenderableType:
-    """A slowest-items table with long common path prefixes folded into the title.
-
-    Args:
-        title: Table caption.
-        entries: Rows, already ranked.
-
-    Returns:
-        The table.
-    """
+    """A slowest-items table with long common path prefixes folded into the title."""
     prefix, names = _strip_common_dir([entry.name for entry in entries])
     caption = f"{title} (under {prefix})" if prefix else title
     return table(
@@ -163,15 +130,7 @@ def _entries_table(title: str, entries: Sequence[Entry]) -> RenderableType:
 
 
 def _strip_common_dir(names: Sequence[str]) -> tuple[str | None, list[str]]:
-    """Remove the directory every absolute path in a list shares.
-
-    Args:
-        names: Row names; only a list of two or more absolute paths is shortened.
-
-    Returns:
-        The removed prefix (or ``None`` when nothing was removed) and the names
-        to display.
-    """
+    """Remove the directory every absolute path in a list shares."""
     if len(names) < 2 or not all(Path(name).is_absolute() for name in names):
         return None, list(names)
     common = os.path.commonpath(names)
@@ -181,14 +140,7 @@ def _strip_common_dir(names: Sequence[str]) -> tuple[str | None, list[str]]:
 
 
 def format_report(report: Report) -> str:
-    """Render the whole report: summary, then critical path, parallelism and artifact sizes.
-
-    Args:
-        report: The report.
-
-    Returns:
-        The text.
-    """
+    """Render the whole report: summary, then critical path, parallelism and artifact sizes."""
     return (
         format_summary(report.summary)
         + "\n"
@@ -203,17 +155,7 @@ def format_report(report: Report) -> str:
 
 
 def critical_path_table(path: CriticalPath | Unavailable) -> RenderableType:
-    """The critical path as a table of segments, or the reason there is none.
-
-    Args:
-        path: The analyzer's result.
-
-    Returns:
-        The table, captioned with the lower bound and its share of the span,
-        one row per segment of the chain in build order, followed by the
-        unattributed custom commands when there are any; or one line with
-        the reason.
-    """
+    """The critical path as a table of segments, or the reason there is none."""
     if isinstance(path, Unavailable):
         return Text(f"critical path: {path.reason}")
     caption = (
@@ -241,14 +183,7 @@ def critical_path_table(path: CriticalPath | Unavailable) -> RenderableType:
 
 
 def utilization_lines(parallelism: Utilization) -> RenderableType:
-    """Parallelism in three lines.
-
-    Args:
-        parallelism: The analyzer's result.
-
-    Returns:
-        The measured numbers and the recommendation.
-    """
+    """Parallelism in three lines."""
     cores = f" of {parallelism.cpu_count} cores" if parallelism.cpu_count is not None else ""
     return Text(
         f"parallelism: peak {parallelism.peak_parallelism}{cores}, "
@@ -261,14 +196,7 @@ def utilization_lines(parallelism: Utilization) -> RenderableType:
 
 
 def sizes_tables(sizes: ArtifactSizes) -> list[RenderableType]:
-    """Artifact sizes: a total line, the kinds, and the largest files.
-
-    Args:
-        sizes: The analyzer's result.
-
-    Returns:
-        Renderables; a single line when the run recorded no artifacts.
-    """
+    """Artifact sizes: a total line, the kinds, and the largest files."""
     if not sizes.by_kind:
         return [Text("artifacts: none recorded")]
     count = sum(total.count for total in sizes.by_kind)

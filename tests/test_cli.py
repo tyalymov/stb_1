@@ -13,14 +13,7 @@ from longpole.errors import LongpoleError
 
 
 def echo(word: str, /) -> int:
-    """Print a word.
-
-    Args:
-        word: What to print.
-
-    Returns:
-        0.
-    """
+    """Print a word."""
     output.stdout(word)
     return 0
 
@@ -47,14 +40,7 @@ def register() -> Iterator[Register]:
 
 
 def _lines(text: str) -> list[str]:
-    """Split text into lines without trailing whitespace, which rich pads for alignment.
-
-    Args:
-        text: The text.
-
-    Returns:
-        The lines.
-    """
+    """Split text into lines without trailing whitespace, which rich pads for alignment."""
     return [line.rstrip() for line in text.splitlines()]
 
 

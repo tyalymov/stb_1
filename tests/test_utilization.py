@@ -12,16 +12,7 @@ from tests.support.runs import sample_run
 
 
 def _step(start_ms: int, duration_ms: int, role: str = "compile") -> Step:
-    """A minimal step occupying a time interval.
-
-    Args:
-        start_ms: Start time.
-        duration_ms: Duration.
-        role: Step role.
-
-    Returns:
-        The step.
-    """
+    """A minimal step occupying a time interval."""
     return Step(
         role=role,
         command="cc",

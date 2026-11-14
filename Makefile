@@ -3,7 +3,6 @@
 lint:
 	uv run ruff check .
 	uv run ruff format --check .
-	uvx pydoclint@0.12.0 src
 
 typecheck:
 	uv run pyright

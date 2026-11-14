@@ -52,11 +52,7 @@ class DataVersion:
     minor: int
 
     def __str__(self) -> str:
-        """Format the version the way CMake prints it.
-
-        Returns:
-            ``major.minor``, e.g. ``1.2``.
-        """
+        """Format the version the way CMake prints it."""
         return f"{self.major}.{self.minor}"
 
 
@@ -216,12 +212,6 @@ class Graph:
     def target(self, target_id: str) -> TargetNode:
         """Look a target up by its File API id.
 
-        Args:
-            target_id: Id as it appears in :attr:`edges`.
-
-        Returns:
-            The matching node.
-
         Raises:
             KeyError: No target has that id.
         """
@@ -231,14 +221,7 @@ class Graph:
         raise KeyError(target_id)
 
     def dependencies_of(self, target_id: str) -> tuple[str, ...]:
-        """Ids of the targets that must be built before the given one.
-
-        Args:
-            target_id: Id of the dependent target.
-
-        Returns:
-            Dependency ids in edge order; empty for a target with none.
-        """
+        """Ids of the targets that must be built before the given one."""
         return tuple(dependency for dependent, dependency in self.edges if dependent == target_id)
 
 
@@ -356,14 +339,7 @@ class Run:
     system: SystemInfo | None = None
 
     def steps_with_role(self, role: str) -> tuple[Step, ...]:
-        """Select steps of one role, keeping index order.
-
-        Args:
-            role: Role name as CMake writes it, e.g. ``compile``.
-
-        Returns:
-            Matching steps; empty if none.
-        """
+        """Select steps of one role, keeping index order."""
         return tuple(step for step in self.steps if step.role == role)
 
     @property

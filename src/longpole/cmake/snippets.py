@@ -86,17 +86,6 @@ def read_index(path: Path, *, data_dir: Path | None = None, validate_schema: boo
     Nothing on disk is modified. The returned snippet paths are not checked
     for existence; :func:`read_steps` reports a missing one.
 
-    Args:
-        path: The index file, as CMake passed it to the callback.
-        data_dir: Directory to resolve the snippet paths against instead of
-            the ``dataDir`` recorded in the index. Needed when the index and
-            its snippets were copied elsewhere, as a run dump's ``raw/`` is.
-        validate_schema: Check the document against the vendored index
-            schema before reading it. Off only for data already validated.
-
-    Returns:
-        The parsed index.
-
     Raises:
         FileNotFoundError: ``path`` does not exist. CMake deletes the index
             once callbacks finish, so a late read is a real failure.
@@ -134,13 +123,6 @@ def read_steps(index: Index, *, validate_schema: bool = True) -> tuple[Step, ...
     An index with no snippets, as ``postCMakeWorkflow`` produces, yields an
     empty tuple; that is a valid outcome, not an error.
 
-    Args:
-        index: The index whose snippets to read.
-        validate_schema: Check each snippet against the vendored schema first.
-
-    Returns:
-        One step per snippet, in index order.
-
     Raises:
         FileNotFoundError: A listed snippet is gone.
         SnippetFormatError: A snippet is not a JSON object or has a field of
@@ -155,13 +137,6 @@ def read_steps(index: Index, *, validate_schema: bool = True) -> tuple[Step, ...
 
 def read_snippet(path: Path, *, validate_schema: bool = True) -> Step:
     """Read one snippet file.
-
-    Args:
-        path: The snippet file.
-        validate_schema: Check the document against the vendored schema first.
-
-    Returns:
-        The normalised step.
 
     Raises:
         FileNotFoundError: ``path`` does not exist.
@@ -186,13 +161,6 @@ def step_from_snippet(snippet: Json, *, source: Path | None = None) -> Step:
     become ``None`` or empty tuples; every unknown field is copied verbatim
     into ``Step.extra``.
 
-    Args:
-        snippet: The snippet as CMake wrote it.
-        source: Where it came from, for error messages only.
-
-    Returns:
-        The step.
-
     Raises:
         SnippetFormatError: A required field is missing or a field has the
             wrong type.
@@ -206,12 +174,6 @@ def step_from_snippet(snippet: Json, *, source: Path | None = None) -> Step:
 
 def _step(snippet: Json) -> Step:
     """Build a Step from a snippet, reporting bad fields as ``FieldError``.
-
-    Args:
-        snippet: The snippet as CMake wrote it.
-
-    Returns:
-        The step.
 
     Raises:
         FieldError: A required field is missing or a field has the wrong type.
@@ -252,12 +214,6 @@ def system_info_from_static(static: Json) -> SystemInfo:
     Every value may be ``null`` on a platform CMake cannot query, so nothing
     here is required. The whole object is kept in ``raw``.
 
-    Args:
-        static: The ``staticSystemInformation`` object.
-
-    Returns:
-        The host description.
-
     Raises:
         IndexFormatError: A field has the wrong type.
     """
@@ -269,12 +225,6 @@ def system_info_from_static(static: Json) -> SystemInfo:
 
 def _system_info(static: Json) -> SystemInfo:
     """Convert ``staticSystemInformation``, reporting bad fields as ``FieldError``.
-
-    Args:
-        static: The object from the index.
-
-    Returns:
-        The host description.
 
     Raises:
         FieldError: A field has the wrong type.
@@ -295,12 +245,6 @@ def _system_info(static: Json) -> SystemInfo:
 def _data_version(fields: Fields) -> DataVersion:
     """Read the ``version`` object of an index or snippet.
 
-    Args:
-        fields: Accessor over the document.
-
-    Returns:
-        The data version.
-
     Raises:
         FieldError: ``version`` is missing or malformed.
     """
@@ -310,12 +254,6 @@ def _data_version(fields: Fields) -> DataVersion:
 
 def _process_metrics(metrics: Json) -> ProcessMetrics:
     """Convert a ``processMetrics`` object.
-
-    Args:
-        metrics: The object from the snippet.
-
-    Returns:
-        Typed metrics.
 
     Raises:
         FieldError: A field is missing or not an integer.
@@ -330,12 +268,6 @@ def _process_metrics(metrics: Json) -> ProcessMetrics:
 
 def _host_load(load: Json) -> HostLoad:
     """Convert a ``dynamicSystemInformation`` object.
-
-    Args:
-        load: The object from the snippet.
-
-    Returns:
-        Typed host load.
 
     Raises:
         FieldError: A field is missing or not a number.

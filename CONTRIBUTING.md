@@ -37,12 +37,12 @@ things:
 2. The contract: what is guaranteed on success, and under which conditions
    which exception is raised and what has already happened by then (for
    example whether anything was written to disk).
-3. One line per argument and for the return value, plus a list of the
-   exceptions it raises.
+3. The exceptions it raises, in a `Raises:` section.
 
-The format is Google style (`Args:`, `Returns:`, `Raises:`). Tooling enforces
-it: ruff checks presence and shape, pydoclint checks that every argument,
-the return value and every raised exception are documented.
+Arguments and the return value are not listed: names and type hints carry
+them, and anything they do not say goes into the description. The one
+exception is a command function, whose `Args:` section is the `--help` text
+of its options. ruff checks that every docstring is there and well formed.
 
 ```python
 def read_index(path: Path) -> Index:
@@ -51,13 +51,6 @@ def read_index(path: Path) -> Index:
     Succeeds only if the file is a well-formed v1 index; nothing is cached or
     modified on disk. Snippet paths inside are returned as written, relative
     to ``index.data_dir``.
-
-    Args:
-        path: Location of ``index-<timestamp>.json`` as CMake passed it to
-            the callback.
-
-    Returns:
-        Parsed index with the hook name and the list of snippet paths.
 
     Raises:
         IndexFormatError: The file is not JSON, or its ``version`` is not a

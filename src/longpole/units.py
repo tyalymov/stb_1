@@ -8,15 +8,7 @@ from __future__ import annotations
 
 
 def duration(milliseconds: int) -> str:
-    """Format a duration the way a person reads build output.
-
-    Args:
-        milliseconds: Non-negative duration in milliseconds.
-
-    Returns:
-        ``"42 ms"`` below a second, ``"1.6 s"`` below a minute, ``"2m 05s"``
-        below an hour, ``"1h 02m"`` from an hour on.
-    """
+    """Format a duration the way a person reads build output."""
     if milliseconds < 1_000:
         return f"{milliseconds} ms"
     seconds = milliseconds / 1_000
@@ -30,14 +22,7 @@ def duration(milliseconds: int) -> str:
 
 
 def size(byte_count: int) -> str:
-    """Format a byte count with a binary unit.
-
-    Args:
-        byte_count: Non-negative size in bytes.
-
-    Returns:
-        ``"512 B"``, ``"3.4 KiB"``, ``"12.0 MiB"`` or ``"1.2 GiB"``.
-    """
+    """Format a byte count with a binary unit."""
     value = float(byte_count)
     for unit in ("B", "KiB", "MiB"):
         if value < 1024:

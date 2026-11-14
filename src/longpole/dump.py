@@ -49,14 +49,6 @@ def write_dump(
     deletes the originals itself once the callback returns. The manifest is
     written last, so a directory that has one is a complete dump.
 
-    Args:
-        directory: Target directory; usually ``<store>/runs/<run_id>``.
-        manifest: What the callback knows about the run.
-        index: CMake's index file, copied to ``raw/index.json``.
-        snippets: The snippet files it lists, copied under ``raw/snippets/``.
-        reply_dir: A File API reply directory to copy as ``raw/fileapi/``,
-            or ``None`` when this run brings no graph.
-
     Raises:
         OSError: The directory cannot be created or a file cannot be copied.
     """
@@ -73,12 +65,6 @@ def write_dump(
 def read_manifest(directory: Path) -> Manifest:
     """Read a dump's manifest.
 
-    Args:
-        directory: A dump directory.
-
-    Returns:
-        The manifest.
-
     Raises:
         FileNotFoundError: ``manifest.json`` is missing.
         DumpFormatError: The file is not the JSON the format promises, or a
@@ -93,12 +79,6 @@ def read_manifest(directory: Path) -> Manifest:
 def read_index(directory: Path) -> snippets.Index:
     """Read the copied index, with snippet paths pointing into the dump.
 
-    Args:
-        directory: A dump directory.
-
-    Returns:
-        The index as CMake wrote it, relocated to ``raw/snippets/``.
-
     Raises:
         FileNotFoundError: ``raw/index.json`` is missing.
         IndexFormatError: The index is not v1 data.
@@ -108,14 +88,7 @@ def read_index(directory: Path) -> snippets.Index:
 
 
 def reply_dir(directory: Path) -> Path:
-    """Where a dump keeps its copy of the File API reply, existing or not.
-
-    Args:
-        directory: A dump directory.
-
-    Returns:
-        ``raw/fileapi`` under it.
-    """
+    """Where a dump keeps its copy of the File API reply, existing or not."""
     return directory / RAW / FILEAPI
 
 
@@ -126,15 +99,6 @@ def read_run(directory: Path, *, reply_from: Path | None = None) -> Run:
     this longpole has fields the vendored schema forbids, and the point of
     keeping raw files is that such a dump still reads, unknown fields landing
     in ``Step.extra``.
-
-    Args:
-        directory: A dump directory.
-        reply_from: File API reply directory to take the graph from when the
-            dump has none of its own; a build run borrows it from the
-            configure before it. ``None`` leaves the run without a graph.
-
-    Returns:
-        The run.
 
     Raises:
         FileNotFoundError: The manifest, the index or a listed snippet is missing.
@@ -160,23 +124,12 @@ def read_run(directory: Path, *, reply_from: Path | None = None) -> Run:
 
 
 def _write_json(path: Path, document: object) -> None:
-    """Write one JSON document with stable key order.
-
-    Args:
-        path: Target file.
-        document: Anything ``json.dumps`` accepts.
-    """
+    """Write one JSON document with stable key order."""
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _manifest(fields: Fields) -> Manifest:
     """Rebuild a :class:`~longpole.model.Manifest`.
-
-    Args:
-        fields: Accessor over ``manifest.json``.
-
-    Returns:
-        The manifest.
 
     Raises:
         FieldError: A field is missing or has the wrong type.
@@ -195,12 +148,6 @@ def _manifest(fields: Fields) -> Manifest:
 
 def _environment(fields: Fields) -> Environment:
     """Rebuild an :class:`~longpole.model.Environment`.
-
-    Args:
-        fields: Accessor over the ``environment`` object.
-
-    Returns:
-        The environment.
 
     Raises:
         FieldError: A field has the wrong type.
@@ -221,13 +168,6 @@ def pack(directory: Path, archive: Path) -> Path:
     (the run id), so unpacking next to other runs cannot collide with them.
     Parent directories of ``archive`` are created. An existing file at
     ``archive`` is replaced.
-
-    Args:
-        directory: A dump directory written by :func:`write_dump`.
-        archive: Target file; conventionally ``<run_id>.tar.zst``.
-
-    Returns:
-        ``archive``.
 
     Raises:
         FileNotFoundError: ``directory`` has no ``manifest.json``.
@@ -253,13 +193,6 @@ def unpack(archive: Path, destination: Path) -> Path:
     ``destination / <run_id>``. ``destination`` may already contain other
     dumps. Member paths that would escape the staging directory are rejected
     by tarfile's ``data`` filter.
-
-    Args:
-        archive: File written by :func:`pack`.
-        destination: Directory to place the dump in; created if needed.
-
-    Returns:
-        The extracted dump directory.
 
     Raises:
         FileNotFoundError: ``archive`` does not exist.

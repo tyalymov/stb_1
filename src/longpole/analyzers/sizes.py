@@ -105,13 +105,6 @@ def artifact_sizes(run: Run, *, top: int = 10) -> ArtifactSizes:
     Pure: reads the run, touches nothing else. An output written by several
     steps, as a static library is by ``ar`` and then ``ranlib``, counts once,
     with the size the last step left it at.
-
-    Args:
-        run: A stored run; one without recorded sizes yields empty tables.
-        top: Rows to keep in the per-target and largest-artifact tables.
-
-    Returns:
-        The sizes.
     """
     artifacts = _artifacts(run.steps, run.graph)
     kind_counts: Counter[str] = Counter()
@@ -145,15 +138,7 @@ def artifact_sizes(run: Run, *, top: int = 10) -> ArtifactSizes:
 
 
 def _artifacts(steps: tuple[Step, ...], graph: Graph | None) -> list[Artifact]:
-    """Collect one artifact per distinct output path.
-
-    Args:
-        steps: The run's steps, in order.
-        graph: Target graph for classifying link outputs, or ``None``.
-
-    Returns:
-        Artifacts in first-seen order, each with the last recorded size.
-    """
+    """Collect one artifact per distinct output path."""
     target_types = {target.name: target.type for target in graph.targets} if graph else {}
     seen: dict[tuple[str, str], Artifact] = {}
     for step in steps:
@@ -169,18 +154,7 @@ def _artifacts(steps: tuple[Step, ...], graph: Graph | None) -> list[Artifact]:
 
 
 def _kind(step: Step, path: str, target_types: dict[str, str]) -> str:
-    """Classify an output.
-
-    Args:
-        step: The step that wrote it.
-        path: The output path.
-        target_types: File API target types by name, possibly empty.
-
-    Returns:
-        ``object`` for compile outputs; for link outputs the target's type
-        when the graph knows it, else ``library`` for library extensions and
-        ``executable`` otherwise; ``generated`` for everything else.
-    """
+    """Classify an output."""
     if step.role == "compile":
         return OBJECT
     if step.role != "link":

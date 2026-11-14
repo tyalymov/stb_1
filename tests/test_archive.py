@@ -14,15 +14,7 @@ from tests.support.runs import raw_files, sample_run, write_run
 
 
 def _dump(run: Run, tmp_path: Path) -> Path:
-    """Write a run's dump under ``tmp_path/source``.
-
-    Args:
-        run: The run.
-        tmp_path: The test's temporary directory.
-
-    Returns:
-        The dump directory, named after the run.
-    """
+    """Write a run's dump under ``tmp_path/source``."""
     files = raw_files(run, tmp_path / "raw")
     source = tmp_path / "source" / run.manifest.run_id
     dump.write_dump(

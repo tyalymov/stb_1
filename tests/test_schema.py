@@ -12,14 +12,7 @@ from tests.support.cmake import InstrumentationQuery
 
 
 def _snippet(**overrides: object) -> Json:
-    """A minimal valid data-1.0 compile snippet, with fields overridden on request.
-
-    Args:
-        **overrides: Fields to replace or add.
-
-    Returns:
-        The snippet as CMake would write it.
-    """
+    """A minimal valid data-1.0 compile snippet, with fields overridden on request."""
     snippet: Json = {
         "version": {"major": 1, "minor": 0},
         "role": "compile",

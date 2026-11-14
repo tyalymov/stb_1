@@ -33,9 +33,6 @@ def _cmake_from_environment() -> Path | None:
     ``LONGPOLE_CMAKE`` may point at the ``cmake`` executable or at the
     directory that contains it, as an absolute or a relative path; without
     it we take whatever is on ``PATH``.
-
-    Returns:
-        Absolute path to an executable ``cmake``, or ``None`` if there is none.
     """
     configured = os.environ.get("LONGPOLE_CMAKE")
     if configured:
@@ -49,12 +46,6 @@ def _cmake_from_environment() -> Path | None:
 
 def cmake_version_of(cmake: Path) -> tuple[int, int, int]:
     """Read ``major.minor.patch`` from ``cmake --version``.
-
-    Args:
-        cmake: Executable to query.
-
-    Returns:
-        The three numeric components; release-candidate suffixes are dropped.
 
     Raises:
         RuntimeError: The output did not start with ``cmake version X.Y.Z``.
@@ -70,11 +61,7 @@ def cmake_version_of(cmake: Path) -> tuple[int, int, int]:
 
 @pytest.fixture(scope="session")
 def cmake_binary() -> Path:
-    """The CMake executable for this session; skips when none is usable.
-
-    Returns:
-        Path to a ``cmake`` of version 4.3 or newer.
-    """
+    """The CMake executable for this session; skips when none is usable."""
     cmake = _cmake_from_environment()
     if cmake is None:
         pytest.skip("no cmake found; set LONGPOLE_CMAKE or put cmake on PATH")
@@ -86,42 +73,20 @@ def cmake_binary() -> Path:
 
 @pytest.fixture
 def cmake_on_path(cmake_binary: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Put the session's CMake first on PATH, where `enable` looks for it.
-
-    Args:
-        cmake_binary: The session's CMake.
-        monkeypatch: pytest's monkeypatch fixture.
-
-    Returns:
-        The same executable.
-    """
+    """Put the session's CMake first on PATH, where `enable` looks for it."""
     monkeypatch.setenv("PATH", f"{cmake_binary.parent}{os.pathsep}{os.environ.get('PATH', '')}")
     return cmake_binary
 
 
 @pytest.fixture(scope="session")
 def cmake_version(cmake_binary: Path) -> tuple[int, int, int]:
-    """Version of :func:`cmake_binary` as a comparable tuple.
-
-    Args:
-        cmake_binary: The session's CMake.
-
-    Returns:
-        ``(major, minor, patch)``.
-    """
+    """Version of :func:`cmake_binary` as a comparable tuple."""
     return cmake_version_of(cmake_binary)
 
 
 @pytest.fixture(params=["Ninja", "Unix Makefiles"])
 def generator(request: pytest.FixtureRequest) -> str:
-    """Each generator that supports instrumentation, one test run per value.
-
-    Args:
-        request: pytest's parametrization handle.
-
-    Returns:
-        The generator name to pass to ``cmake -G``.
-    """
+    """Each generator that supports instrumentation, one test run per value."""
     name: str = request.param
     if name == "Ninja" and shutil.which("ninja") is None:
         pytest.skip("ninja not on PATH")
@@ -135,16 +100,6 @@ def make_project(
 
     The fixture sources are copied, so a test may edit them without touching
     the checked-in files.
-
-    Args:
-        fixture: Directory name under ``tests/fixtures``.
-        tmp_path: pytest's per-test temporary directory.
-        cmake: CMake executable to drive the project with.
-        generator: CMake generator name.
-
-    Returns:
-        An unconfigured project with ``source``, ``build`` and ``capture``
-        subdirectories under ``tmp_path``.
     """
     source = tmp_path / "source"
     shutil.copytree(FIXTURES / fixture, source)
@@ -159,31 +114,13 @@ def make_project(
 
 @pytest.fixture
 def chain(tmp_path: Path, cmake_binary: Path, generator: str) -> CMakeProject:
-    """The ``chain`` fixture project: three targets in a strict dependency chain.
-
-    Args:
-        tmp_path: pytest's per-test temporary directory.
-        cmake_binary: The session's CMake.
-        generator: Generator under test.
-
-    Returns:
-        An unconfigured project; call ``write_query`` and ``configure`` first.
-    """
+    """The ``chain`` fixture project: three targets in a strict dependency chain."""
     return make_project("chain", tmp_path, cmake_binary, generator)
 
 
 @pytest.fixture
 def fanout(tmp_path: Path, cmake_binary: Path, generator: str) -> CMakeProject:
-    """The ``fanout`` fixture project: eight independent generated sources, one executable.
-
-    Args:
-        tmp_path: pytest's per-test temporary directory.
-        cmake_binary: The session's CMake.
-        generator: Generator under test.
-
-    Returns:
-        An unconfigured project.
-    """
+    """The ``fanout`` fixture project: eight independent generated sources, one executable."""
     return make_project("fanout", tmp_path, cmake_binary, generator)
 
 
@@ -193,13 +130,6 @@ def with_tests(tmp_path: Path, cmake_binary: Path) -> CMakeProject:
 
     Uses Ninja only; the generator does not matter for a project with no
     languages, and ctest writes test snippets itself.
-
-    Args:
-        tmp_path: pytest's per-test temporary directory.
-        cmake_binary: The session's CMake.
-
-    Returns:
-        An unconfigured project.
     """
     return make_project("with_tests", tmp_path, cmake_binary)
 
@@ -235,13 +165,6 @@ def built_chain(cmake_binary: Path, tmp_path_factory: pytest.TempPathFactory) ->
     parse what CMake wrote share one build instead of repeating it. The File
     API query is in place before configure, so the reply exists too. Tests
     that modify the tree must not use this fixture.
-
-    Args:
-        cmake_binary: The session's CMake.
-        tmp_path_factory: pytest's session-wide temporary directory factory.
-
-    Returns:
-        The built project and everything the callback captured.
     """
     if cmake_binary not in _BUILT_CHAINS:
         version = cmake_version_of(cmake_binary)
@@ -264,14 +187,7 @@ def built_chain(cmake_binary: Path, tmp_path_factory: pytest.TempPathFactory) ->
 
 @pytest.fixture
 def chain_run(built_chain: BuiltChain) -> Run:
-    """The chain fixture's build run assembled from what CMake wrote, graph included.
-
-    Args:
-        built_chain: The shared build.
-
-    Returns:
-        A run as `longpole capture` would have stored it.
-    """
+    """The chain fixture's build run assembled from what CMake wrote, graph included."""
     capture = built_chain.build_capture
     index = snippets.read_index(
         capture.directory / "index.json", data_dir=capture.directory / "snippets"
@@ -306,13 +222,6 @@ def fanout_run(cmake_binary: Path, tmp_path_factory: pytest.TempPathFactory) -> 
     jobs, which is what the utilization and critical path analyzers need to
     see. Built once per session with the default CMake; the tree is not
     exposed, so nothing can modify it.
-
-    Args:
-        cmake_binary: The session's CMake.
-        tmp_path_factory: pytest's session-wide temporary directory factory.
-
-    Returns:
-        The ``postCMakeBuild`` run of that build.
     """
     if cmake_binary not in _FANOUT_RUNS:
         project = make_project("fanout", tmp_path_factory.mktemp("built-fanout"), cmake_binary)

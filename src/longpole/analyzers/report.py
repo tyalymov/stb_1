@@ -35,15 +35,7 @@ class Report:
 
 
 def build_report(run: Run, *, top: int = 10) -> Report:
-    """Run every analyzer on a run.
-
-    Args:
-        run: The run.
-        top: Rows per ranked table.
-
-    Returns:
-        The report.
-    """
+    """Run every analyzer on a run."""
     return Report(
         summary=summarize(run, top=top),
         critical_path=critical_path(run),
@@ -59,12 +51,6 @@ def to_json(report: Report) -> dict[str, object]:
     a reader would otherwise have to compute: the critical path's ``share``
     and an ``available`` flag that tells a path from a reason, and the
     utilization's ``tail_share``.
-
-    Args:
-        report: The report.
-
-    Returns:
-        A JSON-ready dictionary.
     """
     data: dict[str, object] = asdict(report)
     path = dict(asdict(report.critical_path))

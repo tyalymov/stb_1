@@ -33,12 +33,6 @@ def collect(build_dir: Path) -> Environment:
     the CPUs and ccache. Every part tolerates absence:
     an unconfigured tree yields an :class:`~longpole.model.Environment` of
     ``None`` values.
-
-    Args:
-        build_dir: The build tree.
-
-    Returns:
-        What could be learned.
     """
     cache = tooling.read_cache(build_dir)
     return Environment(
@@ -50,11 +44,7 @@ def collect(build_dir: Path) -> Environment:
 
 
 def cpu_count() -> int | None:
-    """Logical CPUs available to this process.
-
-    Returns:
-        The count, or ``None`` when the platform does not report one.
-    """
+    """Logical CPUs available to this process."""
     return os.cpu_count()
 
 
@@ -63,10 +53,6 @@ def ccache_stats() -> dict[str, str] | None:
 
     Uses ``ccache --print-stats``, the machine-readable form available since
     ccache 4: one ``name<TAB>value`` pair per line.
-
-    Returns:
-        Counter names and values as strings, or ``None`` when ccache is not
-        on ``PATH`` or does not answer.
     """
     executable = shutil.which("ccache")
     if executable is None:
@@ -88,14 +74,7 @@ def ccache_stats() -> dict[str, str] | None:
 
 
 def parse_ccache_stats(text: str) -> dict[str, str]:
-    """Parse ``ccache --print-stats`` output.
-
-    Args:
-        text: The command's standard output.
-
-    Returns:
-        Mapping from counter name to its value; lines without a tab are skipped.
-    """
+    """Parse ``ccache --print-stats`` output."""
     stats: dict[str, str] = {}
     for line in text.splitlines():
         name, tab, value = line.partition("\t")

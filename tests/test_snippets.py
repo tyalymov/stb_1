@@ -21,15 +21,7 @@ from tests.conftest import BuiltChain
 
 
 def _compile_snippet(minor: int = 0, **overrides: object) -> Json:
-    """A compile snippet of the given data minor version.
-
-    Args:
-        minor: Data minor version to declare.
-        **overrides: Fields to replace or add.
-
-    Returns:
-        The snippet as CMake would write it.
-    """
+    """A compile snippet of the given data minor version."""
     snippet: Json = {
         "version": {"major": 1, "minor": minor},
         "role": "compile",
@@ -155,16 +147,7 @@ def test_read_snippet_validates_against_the_schema(tmp_path: Path) -> None:
 
 
 def _write_index(directory: Path, snippets: list[str], **overrides: object) -> Path:
-    """Write a minimal index file into ``directory``.
-
-    Args:
-        directory: Where to put ``index.json``; also used as ``dataDir``.
-        snippets: Snippet file names to list.
-        **overrides: Index fields to replace or add.
-
-    Returns:
-        Path of the written index.
-    """
+    """Write a minimal index file into ``directory``."""
     index: Json = {
         "version": {"major": 1, "minor": 0},
         "buildDir": str(directory / "build"),

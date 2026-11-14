@@ -54,15 +54,7 @@ class _Placed:
 
 
 def format_trace(run: Run, report: Report) -> str:
-    """Render a run as a JSON trace document.
-
-    Args:
-        run: The run.
-        report: Its report, for the critical path track.
-
-    Returns:
-        The document as text, ready to write to a ``.json`` file.
-    """
+    """Render a run as a JSON trace document."""
     return json.dumps(trace_document(run, report), indent=None, separators=(",", ":"))
 
 
@@ -71,14 +63,6 @@ def trace_document(run: Run, report: Report) -> dict[str, object]:
 
     Timestamps are microseconds from the earliest step start, so the trace
     begins at zero.
-
-    Args:
-        run: The run.
-        report: Its report, for the critical path track.
-
-    Returns:
-        A dictionary with ``traceEvents``, ``displayTimeUnit`` and
-        ``otherData`` describing the run.
     """
     origin_ms = min((step.time_start_ms for step in run.steps), default=0)
     pids = _process_ids(run)
@@ -107,15 +91,7 @@ def trace_document(run: Run, report: Report) -> dict[str, object]:
 
 
 def _process_ids(run: Run) -> dict[str, int]:
-    """Assign a process id to every target.
-
-    Args:
-        run: The run; graph targets come first, then targets that only
-            steps mention.
-
-    Returns:
-        Target name to pid, starting at :data:`FIRST_TARGET_PID`.
-    """
+    """Assign a process id to every target."""
     names: list[str] = []
     if run.graph is not None:
         names.extend(target.name for target in run.graph.targets)
@@ -126,16 +102,7 @@ def _process_ids(run: Run) -> dict[str, int]:
 
 
 def _pid_of(step: Step, pids: dict[str, int]) -> int:
-    """Pick the process a step belongs to.
-
-    Args:
-        step: The step.
-        pids: Target pids.
-
-    Returns:
-        The target's pid for steps with a target; otherwise the tests,
-        unattributed or cmake process.
-    """
+    """Pick the process a step belongs to."""
     if step.target is not None and step.target in pids:
         return pids[step.target]
     if step.role == "test":
@@ -151,13 +118,6 @@ def _place(steps: tuple[Step, ...], pids: dict[str, int]) -> list[_Placed]:
     Lanes are allocated per process and role: a step takes the first lane
     whose previous occupant finished before it started, so steps on one
     lane never overlap and Perfetto draws them as flat slices.
-
-    Args:
-        steps: The run's steps.
-        pids: Target pids.
-
-    Returns:
-        The placements, in start order.
     """
     ordered = sorted(steps, key=lambda step: (step.time_start_ms, -step.duration_ms))
     lane_ends: dict[tuple[int, str], list[int]] = {}
@@ -177,15 +137,7 @@ def _place(steps: tuple[Step, ...], pids: dict[str, int]) -> list[_Placed]:
 
 
 def _tid(role: str, lane: int) -> int:
-    """Number a lane so that lanes of one role sit together in the UI.
-
-    Args:
-        role: The step role.
-        lane: Lane index within the role.
-
-    Returns:
-        A thread id unique within the process.
-    """
+    """Number a lane so that lanes of one role sit together in the UI."""
     order = ("configure", "generate", "custom", "compile", "link", "install", "test")
     base = order.index(role) if role in order else len(order)
     return base * 100 + lane + 1
@@ -193,10 +145,6 @@ def _tid(role: str, lane: int) -> int:
 
 def _process_metadata(run: Run, pids: dict[str, int]) -> Iterable[Event]:
     """Name and order the processes.
-
-    Args:
-        run: The run.
-        pids: Target pids.
 
     Yields:
         ``process_name`` and ``process_sort_index`` metadata events.
@@ -219,9 +167,6 @@ def _process_metadata(run: Run, pids: dict[str, int]) -> Iterable[Event]:
 def _thread_metadata(placed: list[_Placed]) -> Iterable[Event]:
     """Name every lane after its role.
 
-    Args:
-        placed: The placed steps.
-
     Yields:
         One ``thread_name`` event per distinct lane.
     """
@@ -237,30 +182,12 @@ def _thread_metadata(placed: list[_Placed]) -> Iterable[Event]:
 
 
 def _metadata(kind: str, pid: int, tid: int, args: dict[str, object]) -> Event:
-    """A metadata event.
-
-    Args:
-        kind: ``process_name``, ``thread_name`` or ``process_sort_index``.
-        pid: Process id.
-        tid: Thread id.
-        args: The event's arguments.
-
-    Returns:
-        The event.
-    """
+    """A metadata event."""
     return {"ph": "M", "name": kind, "pid": pid, "tid": tid, "args": args}
 
 
 def _step_event(item: _Placed, origin_ms: int) -> Event:
-    """A complete event for one step.
-
-    Args:
-        item: The placed step.
-        origin_ms: Start of the trace in milliseconds since the epoch.
-
-    Returns:
-        The event, with the step's details in ``args``.
-    """
+    """A complete event for one step."""
     step = item.step
     args: dict[str, object] = {"role": step.role, "result": step.result}
     if step.command is not None:
@@ -294,15 +221,7 @@ def _step_event(item: _Placed, origin_ms: int) -> Event:
 
 
 def _step_name(step: Step) -> str:
-    """Label a step the way a person looks for it.
-
-    Args:
-        step: The step.
-
-    Returns:
-        The source file for a compile, the first output for a link or
-        custom command, the test name for a test, the role otherwise.
-    """
+    """Label a step the way a person looks for it."""
     if step.role == "compile" and step.source is not None:
         return step.source.rsplit("/", 1)[-1]
     if step.role == "test" and step.test_name is not None:
@@ -314,11 +233,6 @@ def _step_name(step: Step) -> str:
 
 def _flow_events(run: Run, placed: list[_Placed], origin_ms: int) -> Iterable[Event]:
     """Draw an arrow from each dependency's last step to its dependent's first.
-
-    Args:
-        run: The run, for the graph.
-        placed: The placed steps.
-        origin_ms: Start of the trace.
 
     Yields:
         Paired flow start and finish events for every edge whose two
@@ -369,11 +283,6 @@ def _critical_path_events(
     dependents alongside their dependencies, so each one gets a lane of its
     own and the lane is named after it.
 
-    Args:
-        path: The critical path.
-        placed: The placed steps.
-        origin_ms: Start of the trace.
-
     Yields:
         Thread metadata and complete events on the critical path process.
     """
@@ -408,18 +317,7 @@ def _critical_path_events(
 
 
 def _segment_steps(segment: Segment, placed: list[_Placed]) -> list[Step]:
-    """Find the steps a segment of the critical path stands for.
-
-    Args:
-        segment: The segment.
-        placed: The placed steps.
-
-    Returns:
-        The longest compile of the target for a compile segment, the custom
-        command with the segment's outputs for a custom segment, every link
-        step of the target for a link segment. Empty if the steps cannot be
-        found, which the caller treats as nothing to draw.
-    """
+    """Find the steps a segment of the critical path stands for."""
     steps = [item.step for item in placed if item.step.role == segment.kind]
     if segment.kind == critical_path.LINK:
         return [step for step in steps if step.target == segment.target]

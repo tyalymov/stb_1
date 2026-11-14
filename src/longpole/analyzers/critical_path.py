@@ -146,13 +146,6 @@ def critical_path(run: Run) -> CriticalPath | Unavailable:
     """Find the critical path of a run.
 
     Pure: reads the run, touches nothing else.
-
-    Args:
-        run: A stored run; its graph may be missing.
-
-    Returns:
-        The path, or :class:`Unavailable` with the reason when the run has no
-        graph or no target did any measured work (a test-only run, say).
     """
     if run.graph is None or not run.graph.targets:
         return Unavailable(reason=NO_GRAPH_REASON)
@@ -173,15 +166,7 @@ def critical_path(run: Run) -> CriticalPath | Unavailable:
 
 
 def custom_name(step: Step) -> str:
-    """Name a custom command by what it produces.
-
-    Args:
-        step: A custom step.
-
-    Returns:
-        Its outputs joined with commas, or the command line when CMake
-        recorded no outputs.
-    """
+    """Name a custom command by what it produces."""
     if step.outputs:
         return ", ".join(step.outputs)
     return step.command or "(custom command)"
@@ -255,16 +240,7 @@ class _Schedule:
 def _attribute(
     steps: tuple[Step, ...], graph: Graph
 ) -> tuple[dict[str, _Work], list[Unattributed]]:
-    """Attribute steps to targets and reduce them to per-target costs.
-
-    Args:
-        steps: The run's steps.
-        graph: The target graph the steps belong to.
-
-    Returns:
-        Work by target id for every target of the graph, and the custom
-        commands that matched no target.
-    """
+    """Attribute steps to targets and reduce them to per-target costs."""
     by_name = {target.name: target for target in graph.targets}
     sources_to_target = _generated_sources(graph.targets)
     custom: dict[str, _Longest | None] = {target.id: None for target in graph.targets}
@@ -303,16 +279,7 @@ def _attribute(
 
 
 def _longer(current: _Longest | None, duration_ms: int, detail: str) -> _Longest:
-    """Keep the longer of a recorded step and a new one; the first wins a tie.
-
-    Args:
-        current: The longest step seen so far, if any.
-        duration_ms: Duration of the new step.
-        detail: What the new step was.
-
-    Returns:
-        Whichever is longer.
-    """
+    """Keep the longer of a recorded step and a new one; the first wins a tie."""
     if current is not None and current.duration_ms >= duration_ms:
         return current
     return _Longest(duration_ms=duration_ms, detail=detail)
@@ -321,18 +288,7 @@ def _longer(current: _Longest | None, duration_ms: int, detail: str) -> _Longest
 def _target_of(
     step: Step, by_name: dict[str, TargetNode], sources_to_target: dict[Path, TargetNode]
 ) -> TargetNode | None:
-    """Decide which target a step belongs to.
-
-    Args:
-        step: The step.
-        by_name: Graph targets by name.
-        sources_to_target: Absolute paths of generated sources, by the target
-            that compiles them.
-
-    Returns:
-        The target CMake recorded on the step; else the target whose source
-        the step produced; else ``None``.
-    """
+    """Decide which target a step belongs to."""
     if step.target is not None:
         return by_name.get(step.target)
     if step.role != CUSTOM:
@@ -352,12 +308,6 @@ def _generated_sources(targets: tuple[TargetNode, ...]) -> dict[Path, TargetNode
     the build directory, so they come out absolute, and those are the ones a
     custom command can produce. Relative ones cannot be resolved without the
     source directory and are skipped.
-
-    Args:
-        targets: The graph's targets.
-
-    Returns:
-        Absolute source path to owning target; the first owner wins.
     """
     owners: dict[Path, TargetNode] = {}
     for target in targets:
@@ -369,15 +319,7 @@ def _generated_sources(targets: tuple[TargetNode, ...]) -> dict[Path, TargetNode
 
 
 def _absolute(working_dir: str, output: str) -> Path:
-    """Resolve a step output against the directory the step ran in.
-
-    Args:
-        working_dir: The step's working directory.
-        output: An entry of the step's ``outputs``.
-
-    Returns:
-        The absolute, symlink-resolved path.
-    """
+    """Resolve a step output against the directory the step ran in."""
     return (Path(working_dir) / output).resolve()
 
 
@@ -389,13 +331,6 @@ def _schedule(graph: Graph, work: dict[str, _Work]) -> dict[str, _Schedule]:
     dependencies' times and its own costs. A cycle cannot occur in a graph
     CMake generated, but if one did, the targets on it and everything that
     depends on them would be left out rather than looping forever.
-
-    Args:
-        graph: The target graph.
-        work: Costs of every target in the graph.
-
-    Returns:
-        A schedule for each target reached, by id.
     """
     dependencies: dict[str, list[str]] = {target.id: [] for target in graph.targets}
     dependents: dict[str, list[str]] = {target.id: [] for target in graph.targets}
@@ -418,16 +353,7 @@ def _schedule(graph: Graph, work: dict[str, _Work]) -> dict[str, _Schedule]:
 
 
 def _place(own: _Work, dependencies: list[str], schedule: dict[str, _Schedule]) -> _Schedule:
-    """Compute one target's times from its costs and its dependencies' schedules.
-
-    Args:
-        own: The target's costs.
-        dependencies: Ids of its dependencies, all already scheduled.
-        schedule: Schedules computed so far.
-
-    Returns:
-        The target's schedule.
-    """
+    """Compute one target's times from its costs and its dependencies' schedules."""
     custom_from = _latest(dependencies, lambda dep: schedule[dep].custom_ready_ms)
     deps_custom_ready = schedule[custom_from].custom_ready_ms if custom_from else 0
     if own.custom_ms >= deps_custom_ready:
@@ -453,15 +379,7 @@ def _place(own: _Work, dependencies: list[str], schedule: dict[str, _Schedule]) 
 
 
 def _latest(candidates: list[str], time_of: Callable[[str], int]) -> str | None:
-    """Pick the candidate with the latest time; ties go to the larger id, for determinism.
-
-    Args:
-        candidates: Target ids to choose from.
-        time_of: Time to compare by.
-
-    Returns:
-        The chosen id, or ``None`` when there are no candidates.
-    """
+    """Pick the candidate with the latest time; ties go to the larger id, for determinism."""
     if not candidates:
         return None
     return max(candidates, key=lambda target_id: (time_of(target_id), target_id))
@@ -477,15 +395,6 @@ def _trace(
     compiles, in which case the chain ends with the compile and the custom
     commands that gated it. Zero-length groups are skipped so the chain
     reads as work.
-
-    Args:
-        last: Id of the target with the latest finish.
-        schedule: Every target's schedule.
-        work: Every target's costs.
-        names: Target names by id.
-
-    Returns:
-        The segments in build order.
     """
     backwards: list[Segment] = []
     cursor = last

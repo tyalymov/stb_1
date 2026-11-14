@@ -40,9 +40,6 @@ def analyze(
         top: Rows per table.
         output_format: text, or json for a program.
 
-    Returns:
-        0 on success.
-
     Raises:
         UnknownRunError: The reference names no run, or there is no run to default to.
         DumpFormatError: The stored run is malformed.
@@ -54,13 +51,6 @@ def analyze(
 
 def load_run(store: RunStore, ref: str | None) -> Run:
     """Pick the run to analyse.
-
-    Args:
-        store: The store to read from.
-        ref: An explicit reference, or ``None``.
-
-    Returns:
-        The referenced run, or the newest in the store.
 
     Raises:
         UnknownRunError: The reference matches nothing, or the store is empty.

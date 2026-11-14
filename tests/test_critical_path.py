@@ -23,43 +23,19 @@ Shape = tuple[str, str, int, int]
 
 
 def _path(run: Run) -> CriticalPath:
-    """Compute the critical path and insist that there is one.
-
-    Args:
-        run: The run.
-
-    Returns:
-        The path.
-    """
+    """Compute the critical path and insist that there is one."""
     result = critical_path(run)
     assert isinstance(result, CriticalPath), result
     return result
 
 
 def _shape(path: CriticalPath) -> list[Shape]:
-    """Reduce a chain to the numbers the tests assert on.
-
-    Args:
-        path: The path.
-
-    Returns:
-        One tuple per segment.
-    """
+    """Reduce a chain to the numbers the tests assert on."""
     return [(s.target, s.kind, s.duration_ms, s.start_ms) for s in path.chain]
 
 
 def _step(role: str, target: str, duration_ms: int, **fields: object) -> Step:
-    """Build a step with the fields the analyzer reads and placeholders for the rest.
-
-    Args:
-        role: Snippet role.
-        target: Target the step belongs to.
-        duration_ms: Duration.
-        **fields: Further :class:`Step` fields, e.g. ``source`` or ``outputs``.
-
-    Returns:
-        The step. Wall-clock times are not meaningful; the analyzer ignores them.
-    """
+    """Build a step with the fields the analyzer reads and placeholders for the rest."""
     return Step(
         role=role,
         command=f"{role} for {target}",
@@ -281,12 +257,6 @@ def _costs(run: Run) -> dict[str, tuple[int, int, int]]:
 
     Custom commands are matched to targets the way the fixtures lay them
     out: the generator of ``gen_<t>.c`` belongs to target ``t``.
-
-    Args:
-        run: A run of the chain fixture.
-
-    Returns:
-        ``(custom_ms, compile_ms, link_ms)`` by target name.
     """
     costs: dict[str, list[int]] = {}
     for step in run.steps:

@@ -57,15 +57,7 @@ class RunSummary:
 
     @classmethod
     def of(cls, manifest: Manifest, step_count: int) -> RunSummary:
-        """Summarise a run from what the callback knows without parsing snippets.
-
-        Args:
-            manifest: The run's manifest.
-            step_count: How many snippets its index lists.
-
-        Returns:
-            Its summary.
-        """
+        """Summarise a run from what the callback knows without parsing snippets."""
         return cls(
             run_id=manifest.run_id,
             created_at=manifest.created_at,
@@ -79,12 +71,6 @@ class RunSummary:
     def read(cls, directory: Path) -> RunSummary:
         """Summarise a dump on disk.
 
-        Args:
-            directory: A dump directory.
-
-        Returns:
-            Its summary.
-
         Raises:
             DumpFormatError: The manifest is malformed.
             IndexFormatError: The copied index is not v1 data.
@@ -94,14 +80,7 @@ class RunSummary:
 
 
 def new_run_id(now: datetime) -> str:
-    """Make a run id that sorts by capture time.
-
-    Args:
-        now: Capture time, in UTC; the caller also stores it as ``created_at``.
-
-    Returns:
-        ``YYYYMMDDTHHMMSSZ-xxxxxx`` with six random hex digits.
-    """
+    """Make a run id that sorts by capture time."""
     return f"{now.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
 
 
@@ -115,11 +94,7 @@ class RunStore:
     root: Path
 
     def __init__(self, root: Path) -> None:
-        """Open a store; nothing is created until the first write.
-
-        Args:
-            root: The store directory.
-        """
+        """Open a store; nothing is created until the first write."""
         self.root = root
 
     @property
@@ -151,15 +126,6 @@ class RunStore:
         so a crash mid-write never leaves a half dump under ``runs/``. The
         summary line and the ``latest`` pointer are updated afterwards.
 
-        Args:
-            manifest: What is known about the run; ``run_id`` names the directory.
-            index: CMake's index file.
-            snippets: The snippet files it lists.
-            reply_dir: File API reply directory to keep with the run, if any.
-
-        Returns:
-            The run's directory.
-
         Raises:
             FileExistsError: A run with that id is already stored.
             OSError: A file cannot be copied or the store cannot be written.
@@ -185,11 +151,6 @@ class RunStore:
         ``runs.jsonl`` is the source; if it is missing or unreadable the
         manifests under ``runs/`` are scanned instead and the file rebuilt,
         so a damaged index costs time, not data.
-
-        Returns:
-            Summaries sorted by capture time. Run ids carry whole seconds
-            only, so ``created_at`` decides between runs captured within the
-            same second, as a build and the ctest run right after it are.
         """
         try:
             summaries = self._read_summaries()
@@ -208,16 +169,7 @@ class RunStore:
         label: str | None = None,
         since: datetime | None = None,
     ) -> list[RunSummary]:
-        """Select stored runs.
-
-        Args:
-            build_dir: Keep runs from this build tree only.
-            label: Keep runs carrying this label only.
-            since: Keep runs captured at or after this time only.
-
-        Returns:
-            Matching summaries, oldest first.
-        """
+        """Select stored runs."""
         selected = self.summaries()
         if build_dir is not None:
             wanted = str(build_dir)
@@ -231,13 +183,6 @@ class RunStore:
 
     def resolve(self, ref: str) -> Path:
         """Turn a run reference into the dump directory it names.
-
-        Args:
-            ref: ``latest``, ``latest~N``, ``label:<name>``,
-                a path to a dump directory, or a run id or unique prefix of one.
-
-        Returns:
-            The dump directory.
 
         Raises:
             UnknownRunError: Nothing matches, or an id prefix matches more
@@ -271,12 +216,6 @@ class RunStore:
     def read(self, ref: str) -> Run:
         """Load and parse the run a reference names, graph included when one applies.
 
-        Args:
-            ref: Any reference :meth:`resolve` accepts.
-
-        Returns:
-            The run.
-
         Raises:
             UnknownRunError: The reference names no single run.
             DumpFormatError: The manifest on disk is malformed.
@@ -296,14 +235,6 @@ class RunStore:
         build system by that configure, and the graph did not change since.
         So the newest dump of the same tree captured no later than the run,
         holding a reply, is the one.
-
-        Args:
-            manifest: The run's manifest.
-
-        Returns:
-            The reply directory, or ``None`` when no configure of the tree
-            was recorded before the run (it was generated before recording
-            was enabled; the next ``cmake`` run fixes that).
         """
         for summary in reversed(self.summaries()):
             same_tree = summary.build_dir == manifest.build_dir
@@ -314,11 +245,7 @@ class RunStore:
         return None
 
     def latest(self) -> Run | None:
-        """The newest stored run.
-
-        Returns:
-            The run, or ``None`` for an empty store.
-        """
+        """The newest stored run."""
         summaries = self.summaries()
         if not summaries:
             return None
@@ -326,13 +253,6 @@ class RunStore:
 
     def pack(self, ref: str, into: Path) -> Path:
         """Archive one run as ``<into>/<run_id>.tar.zst``.
-
-        Args:
-            ref: Any reference :meth:`resolve` accepts.
-            into: Directory for the archive; created if needed.
-
-        Returns:
-            The archive path.
 
         Raises:
             UnknownRunError: The reference names no single run.
@@ -347,12 +267,6 @@ class RunStore:
         dump is extracted under ``runs/`` and indexed like a freshly written
         run.
 
-        Args:
-            archive: The ``.tar.zst`` file.
-
-        Returns:
-            The imported run's directory.
-
         Raises:
             FileExistsError: A run with the same id is already stored.
             DumpFormatError: The archive is not a single valid run dump.
@@ -365,15 +279,7 @@ class RunStore:
         return directory
 
     def prune(self, *, keep: int | None = None, older_than: timedelta | None = None) -> list[str]:
-        """Delete old runs.
-
-        Args:
-            keep: Keep only this many newest runs.
-            older_than: Delete runs captured longer ago than this.
-
-        Returns:
-            Ids of the deleted runs, oldest first.
-        """
+        """Delete runs beyond the ``keep`` newest or older than ``older_than``."""
         summaries = self.summaries()
         doomed: set[str] = set()
         if keep is not None and keep < len(summaries):
@@ -392,11 +298,7 @@ class RunStore:
         return sorted(doomed)
 
     def _run_dirs(self) -> list[Path]:
-        """Dump directories under ``runs/``, ignoring staging leftovers.
-
-        Returns:
-            Directories that contain a manifest, sorted by name.
-        """
+        """Dump directories under ``runs/``, ignoring staging leftovers."""
         if not self.runs_dir.is_dir():
             return []
         return sorted(
@@ -407,9 +309,6 @@ class RunStore:
 
     def _read_summaries(self) -> list[RunSummary] | None:
         """Parse ``runs.jsonl``.
-
-        Returns:
-            The summaries, or ``None`` when the file does not exist.
 
         Raises:
             FieldError: A line is a JSON value but not a summary object.
@@ -440,20 +339,12 @@ class RunStore:
         return summaries
 
     def _append_summary(self, summary: RunSummary) -> None:
-        """Add one line to ``runs.jsonl``.
-
-        Args:
-            summary: The line.
-        """
+        """Add one line to ``runs.jsonl``."""
         with self._summaries_path.open("a", encoding="utf-8") as summaries:
             summaries.write(json.dumps(asdict(summary), sort_keys=True) + "\n")
 
     def _rewrite_summaries(self, summaries: Iterable[RunSummary]) -> None:
-        """Replace ``runs.jsonl`` atomically.
-
-        Args:
-            summaries: The lines to keep, in order.
-        """
+        """Replace ``runs.jsonl`` atomically."""
         self.root.mkdir(parents=True, exist_ok=True)
         staging = self._summaries_path.with_suffix(".jsonl.tmp")
         staging.write_text(
@@ -463,11 +354,7 @@ class RunStore:
         staging.replace(self._summaries_path)
 
     def _write_latest(self, run_id: str) -> None:
-        """Point ``latest`` at a run, atomically.
-
-        Args:
-            run_id: The newest run.
-        """
+        """Point ``latest`` at a run, atomically."""
         staging = self._latest_path.with_suffix(".tmp")
         staging.write_text(run_id + "\n", encoding="utf-8")
         staging.replace(self._latest_path)

@@ -17,17 +17,7 @@ from longpole.model import (
 
 
 def _step(role: str, start: int, duration: int, source: str | None = None) -> Step:
-    """Build a step with the required fields filled and the rest defaulted.
-
-    Args:
-        role: Snippet role.
-        start: ``time_start_ms``.
-        duration: ``duration_ms``.
-        source: Source file, for compile steps.
-
-    Returns:
-        The step.
-    """
+    """Build a step with the required fields filled and the rest defaulted."""
     return Step(
         role=role,
         command="true",
@@ -40,14 +30,7 @@ def _step(role: str, start: int, duration: int, source: str | None = None) -> St
 
 
 def _run(*steps: Step) -> Run:
-    """Wrap steps in a run with a minimal manifest.
-
-    Args:
-        *steps: Steps of the run, in order.
-
-    Returns:
-        The run.
-    """
+    """Wrap steps in a run with a minimal manifest."""
     manifest = Manifest(
         run_id="20261031T000000Z-000000",
         created_at="2026-10-31T00:00:00Z",

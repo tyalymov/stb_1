@@ -28,12 +28,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     containing ``index.json``, ``argv.json`` with the exact arguments CMake
     passed, and ``snippets/`` with a copy of every listed snippet. Nothing in
     the build tree is modified; CMake's own cleanup runs after we return.
-
-    Args:
-        argv: ``[capture_root, index_path]``; ``None`` means ``sys.argv[1:]``.
-
-    Returns:
-        0 on success, 2 when the arguments are missing.
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if len(args) != 2:

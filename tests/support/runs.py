@@ -49,16 +49,7 @@ class RawFiles:
 
 
 def raw_files(run: Run, directory: Path) -> RawFiles:
-    """Write a run back out as the files CMake would have produced for it.
-
-    Args:
-        run: The run; its steps become snippets, its graph and toolchains a
-            File API reply, its system information the index's static block.
-        directory: Where to write; created if needed.
-
-    Returns:
-        The paths.
-    """
+    """Write a run back out as the files CMake would have produced for it."""
     snippet_dir = directory / "snippets"
     snippet_dir.mkdir(parents=True, exist_ok=True)
     version = run.data_version
@@ -86,15 +77,7 @@ def raw_files(run: Run, directory: Path) -> RawFiles:
 
 
 def write_run(store: RunStore, run: Run) -> Path:
-    """Put a run into a store the way the callback would, from synthesised raw files.
-
-    Args:
-        store: The store.
-        run: The run to store.
-
-    Returns:
-        The run's directory in the store.
-    """
+    """Put a run into a store the way the callback would, from synthesised raw files."""
     with tempfile.TemporaryDirectory() as scratch:
         files = raw_files(run, Path(scratch))
         return store.write(
@@ -103,15 +86,7 @@ def write_run(store: RunStore, run: Run) -> Path:
 
 
 def _snippet(step: Step, version: DataVersion) -> Json:
-    """One snippet as CMake writes it, the inverse of ``snippets.step_from_snippet``.
-
-    Args:
-        step: The step.
-        version: Data version to stamp on it.
-
-    Returns:
-        The document.
-    """
+    """One snippet as CMake writes it, the inverse of ``snippets.step_from_snippet``."""
     document: Json = {
         "version": {"major": version.major, "minor": version.minor},
         "role": step.role,
@@ -159,13 +134,7 @@ def _snippet(step: Step, version: DataVersion) -> Json:
 
 
 def _write_reply(reply_dir: Path, graph: Graph, toolchains: tuple[Toolchain, ...]) -> None:
-    """A File API reply directory answering our client with the given graph.
-
-    Args:
-        reply_dir: Directory to create.
-        graph: Targets and edges to describe.
-        toolchains: Compilers to list.
-    """
+    """A File API reply directory answering our client with the given graph."""
     reply_dir.mkdir(parents=True, exist_ok=True)
     entries: list[Json] = []
     for position, target in enumerate(graph.targets):
@@ -226,16 +195,7 @@ def _write_reply(reply_dir: Path, graph: Graph, toolchains: tuple[Toolchain, ...
 
 
 def run_from_capture(capture: CapturedIndex, build_dir: Path) -> Run:
-    """Assemble a run from an index the callback stub saved, the way a store read would.
-
-    Args:
-        capture: The saved index and snippets.
-        build_dir: The build tree the index came from; its File API reply, if
-            any, becomes the run's graph.
-
-    Returns:
-        The run, with a graph when the reply exists and without one otherwise.
-    """
+    """Assemble a run from an index the callback stub saved, the way a store read would."""
     index = snippets.read_index(
         capture.directory / "index.json", data_dir=capture.directory / "snippets"
     )
@@ -270,17 +230,6 @@ def sample_run(
 
     Every optional field of the model is exercised somewhere in the run so a
     round trip through raw files and the store covers them all.
-
-    Args:
-        run_id: Store id.
-        created_at: Capture time.
-        labels: Run labels.
-        build_dir: Build tree path.
-        with_graph: Include a target graph.
-        with_system: Include static host information.
-
-    Returns:
-        The run.
     """
     metrics = ProcessMetrics(max_rss_kib=27216, user_time_us=10889, system_time_us=9964)
     load = HostLoad(

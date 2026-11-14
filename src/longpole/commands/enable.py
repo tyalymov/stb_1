@@ -68,9 +68,6 @@ def enable(
         label: Label every recorded run; may be repeated.
         output_format: text, or json for a program.
 
-    Returns:
-        0 on success; failures raise.
-
     Raises:
         OSError: A query directory cannot be created or written.
     """
@@ -88,14 +85,6 @@ def write_query(build_dir: Path, *, store: Path, labels: tuple[str, ...] = ()) -
     the file is written for data version 1.0 and starts working as soon as a
     CMake that knows the API builds the tree. Writing the same file again is
     harmless. The File API query is planted as well.
-
-    Args:
-        build_dir: The tree.
-        store: Store the callback writes to.
-        labels: Labels the callback attaches to every run.
-
-    Returns:
-        What was written.
 
     Raises:
         OSError: A directory cannot be created or a file written.
@@ -119,9 +108,6 @@ def _requested_data_version() -> DataVersion:
     build. Not having it, or having one older than 4.3, is a warning, not an
     error: the query is written anyway and starts working as soon as a CMake
     that knows the API builds the tree.
-
-    Returns:
-        The version to put in the query.
     """
     try:
         info = tooling.describe(Path("cmake"))
@@ -139,14 +125,7 @@ def _requested_data_version() -> DataVersion:
 
 
 def query_location(build_dir: Path) -> Path:
-    """Where our query file goes.
-
-    Args:
-        build_dir: The tree.
-
-    Returns:
-        ``<build>/.cmake/instrumentation/v1/query/longpole.json``.
-    """
+    """Where our query file goes."""
     return build_dir / ".cmake" / "instrumentation" / "v1" / "query" / "longpole.json"
 
 
@@ -156,13 +135,6 @@ def query_document(data_version: DataVersion, callback: str) -> dict[str, object
     The requested minor matches what the consulted CMake writes: a query
     asking for a newer minor than the CMake knows is silently ignored by it,
     and an older one still gets the newest data anyway.
-
-    Args:
-        data_version: Data version of the CMake that will read the query.
-        callback: Command line to run at each hook; CMake appends the index path.
-
-    Returns:
-        A JSON-ready object with ``version``, ``hooks``, ``callbacks`` and ``options``.
     """
     options = ["staticSystemInformation", "dynamicSystemInformation"]
     if data_version.minor >= 2:  # processMetrics exists from data 1.2 (CMake 4.5)
@@ -193,15 +165,6 @@ def callback_command(*, store: Path, labels: tuple[str, ...] = ()) -> str:
     the labels go on the command line,
     since the callback gets nothing else from the shell that enabled
     recording; the store is made absolute for the same reason.
-
-    Args:
-        store: ``--store`` for the callback.
-        labels: ``--label`` values for the callback.
-
-    Returns:
-        ``longpole capture --store "PATH" [--label "NAME"]...``; every value
-        is double-quoted, which CMake's argument splitting reads the same
-        whether or not it contains whitespace.
     """
     command = f'longpole capture --store "{store.resolve()}"'
     for label in labels:

@@ -50,9 +50,6 @@ def export(
         perfetto: Write the Perfetto trace to PATH ('-' for standard output).
         markdown: Write the Markdown snapshot to PATH ('-' for standard output).
 
-    Returns:
-        0 on success.
-
     Raises:
         UsageError: No format was requested.
         UnknownRunError: The reference names no run, or there is no run to default to.
@@ -73,13 +70,7 @@ def export(
 
 
 def _write(destination: str, text: str, what: str) -> None:
-    """Put rendered text where the user asked.
-
-    Args:
-        destination: A path, or ``-`` for standard output.
-        text: The rendered document.
-        what: Name of the format, for the log line.
-    """
+    """Put rendered text where the user asked."""
     if destination == STDOUT:
         output.stdout(text)
         return

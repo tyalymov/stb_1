@@ -73,9 +73,6 @@ def launcher(
     Args:
         *tokens: The command and its arguments.
         log_level: How much to say on stderr: debug, info, warning (the default) or error.
-
-    Returns:
-        The command's exit code; 0 after the help the bare program prints.
     """
     logging.getLogger("longpole").setLevel(log_level.upper())
     return app(tokens, exit_on_error=False, print_error=False)
@@ -88,15 +85,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     line, an expected error or a bug alike, is logged as one line and becomes
     exit code 1; ``--log-level debug`` adds the stack. Ctrl-C is left to
     Python.
-
-    Args:
-        argv: Arguments without the program name. ``None`` means
-            ``sys.argv[1:]``; that branch exists for the console script entry
-            point, which calls ``main()`` bare. Tests pass a list.
-
-    Returns:
-        0 on success and after ``--help`` or ``--version``; the command's
-        return value otherwise; 1 on any exception.
     """
     args = list(sys.argv[1:] if argv is None else argv)
     init_logging()

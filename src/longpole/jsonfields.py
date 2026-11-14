@@ -19,12 +19,6 @@ Json = dict[str, object]
 def load_object(path: Path) -> Json:
     """Read a file as a JSON object.
 
-    Args:
-        path: File to read.
-
-    Returns:
-        The parsed object.
-
     Raises:
         FileNotFoundError: ``path`` does not exist.
         FieldError: The content is not JSON or not a JSON object.
@@ -58,21 +52,11 @@ class Fields:
     """
 
     def __init__(self, document: Json) -> None:
-        """Wrap a document.
-
-        Args:
-            document: Parsed JSON object.
-        """
+        """Wrap a document."""
         self._document = document
 
     def string(self, key: str) -> str:
         """A required string field.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            Its value.
 
         Raises:
             FieldError: When the field is missing or not a string.
@@ -84,12 +68,6 @@ class Fields:
 
     def optional_string(self, key: str) -> str | None:
         """A string field that may be absent or ``null``.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The string, or ``None``.
 
         Raises:
             FieldError: When the field is present but not a string.
@@ -104,12 +82,6 @@ class Fields:
     def integer(self, key: str) -> int:
         """A required integer field.
 
-        Args:
-            key: Field name.
-
-        Returns:
-            Its value.
-
         Raises:
             FieldError: When the field is missing or not an integer.
         """
@@ -120,12 +92,6 @@ class Fields:
 
     def optional_int(self, key: str) -> int | None:
         """An integer field that may be absent or ``null``.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The integer, or ``None``.
 
         Raises:
             FieldError: When the field is present but not an integer.
@@ -140,12 +106,6 @@ class Fields:
     def optional_bool(self, key: str) -> bool | None:
         """A boolean field that may be absent.
 
-        Args:
-            key: Field name.
-
-        Returns:
-            The boolean, or ``None``.
-
         Raises:
             FieldError: When the field is present but not a boolean.
         """
@@ -159,12 +119,6 @@ class Fields:
     def number(self, key: str) -> float:
         """A required numeric field; integers are accepted and widened.
 
-        Args:
-            key: Field name.
-
-        Returns:
-            The value as a float.
-
         Raises:
             FieldError: When the field is missing or not a number.
         """
@@ -175,12 +129,6 @@ class Fields:
 
     def strings(self, key: str) -> tuple[str, ...]:
         """An optional array of strings; absent means empty.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The strings, in order.
 
         Raises:
             FieldError: When the field is not an array of strings.
@@ -193,12 +141,6 @@ class Fields:
     def integers(self, key: str) -> tuple[int, ...]:
         """An optional array of integers; absent means empty.
 
-        Args:
-            key: Field name.
-
-        Returns:
-            The integers, in order.
-
         Raises:
             FieldError: When the field is not an array of integers.
         """
@@ -210,12 +152,6 @@ class Fields:
     def object(self, key: str) -> Fields:
         """A required nested object, wrapped for further typed access.
 
-        Args:
-            key: Field name.
-
-        Returns:
-            Accessor over the nested object.
-
         Raises:
             FieldError: When the field is missing or not an object.
         """
@@ -226,12 +162,6 @@ class Fields:
 
     def optional_object(self, key: str) -> Json | None:
         """A nested object that may be absent or ``null``.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            The object, or ``None``.
 
         Raises:
             FieldError: When the field is present but not an object.
@@ -246,12 +176,6 @@ class Fields:
     def _optional_list(self, key: str) -> list[object]:
         """An array field that may be absent; absent means empty.
 
-        Args:
-            key: Field name.
-
-        Returns:
-            The raw items.
-
         Raises:
             FieldError: When the field is present but not an array.
         """
@@ -263,24 +187,11 @@ class Fields:
         return cast(list[object], value)
 
     def value(self, key: str) -> object | None:
-        """The raw value of a field, for shapes the typed accessors do not cover.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            Whatever is stored, or ``None`` when absent.
-        """
+        """The raw value of a field, for shapes the typed accessors do not cover."""
         return self._document.get(key)
 
     def objects(self, key: str) -> tuple[Fields, ...]:
         """An optional array of objects, each wrapped; absent means empty.
-
-        Args:
-            key: Field name.
-
-        Returns:
-            Accessors over the items, in order.
 
         Raises:
             FieldError: When the field is not an array of objects.

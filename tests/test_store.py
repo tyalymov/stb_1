@@ -19,15 +19,7 @@ from tests.support.runs import raw_files, sample_run, write_run
 
 
 def _dump(run: Run, tmp_path: Path) -> Path:
-    """Write a run's dump under ``tmp_path/run`` from synthesised raw files.
-
-    Args:
-        run: The run.
-        tmp_path: The test's temporary directory.
-
-    Returns:
-        The dump directory.
-    """
+    """Write a run's dump under ``tmp_path/run`` from synthesised raw files."""
     files = raw_files(run, tmp_path / "raw")
     directory = tmp_path / "run"
     dump.write_dump(
@@ -111,14 +103,7 @@ def test_run_ids_sort_by_time() -> None:
 
 
 def _three_runs(store: RunStore) -> list[Run]:
-    """Store three runs with distinct ids, commits and labels.
-
-    Args:
-        store: Target store.
-
-    Returns:
-        The runs, oldest first.
-    """
+    """Store three runs with distinct ids, commits and labels."""
     runs = [
         sample_run(
             run_id="20261031T120000Z-000001",

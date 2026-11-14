@@ -118,16 +118,7 @@ class Summary:
 
 
 def summarize(run: Run, *, top: int = 10) -> Summary:
-    """Summarise a run.
-
-    Args:
-        run: The run; may have no steps, in which case every table is empty
-            and the totals are zero.
-        top: How many rows each slowest-items table keeps.
-
-    Returns:
-        The summary.
-    """
+    """Summarise a run."""
     leaf_steps = [step for step in run.steps if step.role not in WRAPPER_ROLES]
     return Summary(
         run_id=run.manifest.run_id,
@@ -169,15 +160,7 @@ def summarize(run: Run, *, top: int = 10) -> Summary:
 
 
 def phases(steps: Iterable[Step]) -> tuple[Phase, ...]:
-    """Add up durations by role.
-
-    Args:
-        steps: Steps to group; wrapper roles should already be filtered out.
-
-    Returns:
-        One phase per role present, in :data:`PHASE_ORDER` with unknown
-        roles after it in alphabetical order.
-    """
+    """Add up durations by role."""
     counts: Counter[str] = Counter()
     totals: Counter[str] = Counter()
     for step in steps:
@@ -197,17 +180,7 @@ def slowest(
     detail: Callable[[list[Step]], str],
     top: int,
 ) -> tuple[Entry, ...]:
-    """Group steps by a name and rank the groups by total duration.
-
-    Args:
-        steps: Steps to consider.
-        key: Name of the group a step belongs to.
-        detail: Note for a group, given its steps.
-        top: Rows to keep.
-
-    Returns:
-        Up to ``top`` entries, longest total first, ties by name.
-    """
+    """Group steps by a name and rank the groups by total duration."""
     groups: dict[str, list[Step]] = {}
     for step in steps:
         groups.setdefault(key(step), []).append(step)
@@ -225,26 +198,12 @@ def slowest(
 
 
 def _language_detail(steps: list[Step]) -> str:
-    """Languages of a group of compile steps.
-
-    Args:
-        steps: The group.
-
-    Returns:
-        The distinct languages, e.g. ``C`` or ``C, CXX``; empty when unknown.
-    """
+    """Languages of a group of compile steps."""
     return ", ".join(sorted({step.language for step in steps if step.language}))
 
 
 def _role_mix_detail(steps: list[Step]) -> str:
-    """What kinds of step a target's total is made of.
-
-    Args:
-        steps: The group.
-
-    Returns:
-        Counts by role in :data:`PHASE_ORDER`, e.g. ``1 custom, 3 compile, 1 link``.
-    """
+    """What kinds of step a target's total is made of."""
     counts = Counter(step.role for step in steps)
     ordered = [role for role in PHASE_ORDER if role in counts] + sorted(
         role for role in counts if role not in PHASE_ORDER
@@ -253,29 +212,13 @@ def _role_mix_detail(steps: list[Step]) -> str:
 
 
 def _result_detail(steps: list[Step]) -> str:
-    """Whether a group of steps succeeded.
-
-    Args:
-        steps: The group.
-
-    Returns:
-        ``passed`` when every exit status is zero or unknown, otherwise
-        ``failed (exit N)`` with the first non-zero status.
-    """
+    """Whether a group of steps succeeded."""
     failures = [step.result for step in steps if step.result not in (0, None)]
     return f"failed (exit {failures[0]})" if failures else "passed"
 
 
 def _custom_name(step: Step) -> str:
-    """Name a custom command by what it produces.
-
-    Args:
-        step: A custom step.
-
-    Returns:
-        Its outputs joined with commas, or the command line when CMake
-        recorded no outputs.
-    """
+    """Name a custom command by what it produces."""
     if step.outputs:
         return ", ".join(step.outputs)
     return step.command or "(custom command)"

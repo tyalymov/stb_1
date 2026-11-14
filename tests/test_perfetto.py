@@ -17,14 +17,7 @@ from tests.support.runs import sample_run, write_run
 
 
 def _events(run: Run) -> list[dict[str, object]]:
-    """Render a run and parse the events back.
-
-    Args:
-        run: The run.
-
-    Returns:
-        The ``traceEvents`` list.
-    """
+    """Render a run and parse the events back."""
     document = json.loads(perfetto.format_trace(run, build_report(run)))
     events: list[dict[str, object]] = document["traceEvents"]
     return events
@@ -33,15 +26,7 @@ def _events(run: Run) -> list[dict[str, object]]:
 def _slices(
     events: list[dict[str, object]], category: str | None = None
 ) -> list[dict[str, object]]:
-    """Select complete events, optionally of one category.
-
-    Args:
-        events: Parsed events.
-        category: Keep only this ``cat``; ``None`` keeps every step slice.
-
-    Returns:
-        The matching ``X`` events.
-    """
+    """Select complete events, optionally of one category."""
     chosen = [event for event in events if event["ph"] == "X"]
     if category is None:
         return [event for event in chosen if event["cat"] != perfetto.CRITICAL_PATH_CATEGORY]

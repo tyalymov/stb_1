@@ -19,14 +19,7 @@ CHAIN_BUILD_ROLES = {"custom": 3, "compile": 3, "link": 3, "cmakeBuild": 1}
 
 
 def _instrument(project: CMakeProject, store: Path, *hooks: str, label: str | None = None) -> None:
-    """Point a fixture project at the real callback and at a store of the test's own.
-
-    Args:
-        project: The fixture project.
-        store: Where the callback should write runs, as ``enable`` would bake it in.
-        *hooks: Hooks to request.
-        label: ``--label`` value to pass to the callback, if any.
-    """
+    """Point a fixture project at the real callback and at a store of the test's own."""
     callback = f'{sys.executable} -m longpole capture --store "{store}"'
     if label is not None:
         callback += f" --label {label}"
@@ -40,29 +33,13 @@ def _instrument(project: CMakeProject, store: Path, *hooks: str, label: str | No
 
 
 def _newest(store: RunStore, hook: str) -> Run:
-    """The newest stored run of a hook.
-
-    Args:
-        store: The store.
-        hook: The hook whose run to read.
-
-    Returns:
-        The run.
-    """
+    """The newest stored run of a hook."""
     summary = [s for s in store.summaries() if s.hook == hook][-1]
     return store.read(summary.run_id)
 
 
 def _roles(store: RunStore, hook: str) -> dict[str, int]:
-    """Count steps per role in the newest run of a hook.
-
-    Args:
-        store: The store.
-        hook: The hook whose run to read.
-
-    Returns:
-        Role counts.
-    """
+    """Count steps per role in the newest run of a hook."""
     counts: dict[str, int] = {}
     for step in _newest(store, hook).steps:
         counts[step.role] = counts.get(step.role, 0) + 1
@@ -130,11 +107,7 @@ def test_workflow_records_the_steps_but_not_the_empty_workflow_index(
 
 
 def capture_hooks() -> tuple[str, ...]:
-    """Every hook `enable` requests, so the workflow test sees the same set.
-
-    Returns:
-        The hook names.
-    """
+    """Every hook `enable` requests, so the workflow test sees the same set."""
     return ("postGenerate", "postCMakeBuild", "postCMakeInstall", "postCMakeWorkflow", "postCTest")
 
 
